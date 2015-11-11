@@ -221,7 +221,7 @@ class PyVData:
         self.BDT_Elevation_off = self.OffEvts.Elevation
         self.E_bins_off=np.digitize(self.BDT_ErecS, self.E_grid)-1
         self.Z_bins_off=np.digitize((90.-self.BDT_Elevation), self.Zen_grid)-1
-    def predict_BDT_off(self, modelpath='.', modelbase='BDT', modelext='.model', scaler=Noffe,fit_transform='linear'):
+    def predict_BDT_off(self, modelpath='.', modelbase='BDT', modelext='.model', scaler=None,fit_transform='linear'):
         if not hasattr(self, 'OffEvts'):
             print "No data frame for off events found, running self.get_data_off() now!"
             self.get_data_off()
