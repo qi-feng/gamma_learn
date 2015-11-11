@@ -296,6 +296,8 @@ class PyVData:
             #for i in range(data_off.GetEntries()):
             #    mva_off_[0] = mva_offlist[i]
             #    data_off.Fill()
+            data_on.Write()
+            data_off.Write()
             self.xgbfile.Write()
             self.xgbfile.Close()
 
