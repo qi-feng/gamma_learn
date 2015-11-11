@@ -270,15 +270,17 @@ class PyVData:
             mva_off_ = np.zeros(1, dtype=float)
             mva_onlist = np.zeros(data_on.GetEntries(), dtype=float)
             mva_offlist = np.zeros(data_off.GetEntries(), dtype=float)
-            Bran_MVAon = data_on.Branch('xMVA', mva_, 'xMVA/D')
-            Bran_MVAoff = data_off.Branch('xMVA', mva_off_, 'xMVA/D')
+            #Bran_MVAon = data_on.Branch('xMVA', mva_, 'xMVA/D')
+            #Bran_MVAoff = data_off.Branch('xMVA', mva_off_, 'xMVA/D')
+            data_on.Branch('MVA', mva_, 'MVA/D')
+            data_off.Branch('MVA', mva_off_, 'MVA/D')
             data_on.SetBranchStatus("*", 1)
             data_off.SetBranchStatus("*", 1)
             #for event in data_on:
             #    mva_[0] = self.OnEvts.MVA.values[np.where((self.OnEvts.eventNumber==event.eventNumber) & (self.OnEvts.runNumber==event.runNumber))]
             for i in range(data_on.GetEntries()):
-                data_on.GetEntry(i)
-                mva_[0] = self.OnEvts.MVA.values[np.where((self.OnEvts.eventNumber==data_on.eventNumber) & (self.OnEvts.runNumber==data_on.runNumber))]
+                #data_on.GetEntry(i)
+                #mva_[0] = self.OnEvts.MVA.values[np.where((self.OnEvts.eventNumber==data_on.eventNumber) & (self.OnEvts.runNumber==data_on.runNumber))]
                 mva_[0] = 1
                 #mva_onlist[i] = self.OnEvts.MVA.values[np.where((self.OnEvts.eventNumber==data_on.eventNumber) & (self.OnEvts.runNumber==data_on.runNumber))]
                 data_on.Fill()
@@ -288,10 +290,11 @@ class PyVData:
             #    data_on.Fill()
             #for event in data_off:
             for i in range(data_off.GetEntries()):
-                data_off.GetEntry(i)
-                mva_off_[0] = self.OffEvts.MVA.values[np.where((self.OffEvts.eventNumber==data_off.eventNumber) & (self.OffEvts.runNumber==data_off.runNumber))]
-                #mva_offlist[i] = self.OffEvts.MVA.values[np.where((self.OffEvts.eventNumber==data_off.eventNumber) & (self.OffEvts.runNumber==data_off.runNumber))]
-                #mva_off_[0] = self.OffEvts.MVA.values[np.where((self.OffEvts.eventNumber==event.eventNumber) & (self.OffEvts.runNumber==event.runNumber))]
+                #data_off.GetEntry(i)
+                #mva_off_[0] = self.OffEvts.MVA.values[np.where((self.OffEvts.eventNumber==data_off.eventNumber) & (self.OffEvts.runNumber==data_off.runNumber))]
+                mva_off_[0] = self.OffEvts.MVA.values[i]
+                ##mva_offlist[i] = self.OffEvts.MVA.values[np.where((self.OffEvts.eventNumber==data_off.eventNumber) & (self.OffEvts.runNumber==data_off.runNumber))]
+                ##mva_off_[0] = self.OffEvts.MVA.values[np.where((self.OffEvts.eventNumber==event.eventNumber) & (self.OffEvts.runNumber==event.runNumber))]
                 data_off.Fill()
                 #Bran_MVAoff.Fill()
             #for i in range(data_off.GetEntries()):
