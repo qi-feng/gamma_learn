@@ -248,7 +248,7 @@ class PyVData:
                 predict_y = clf.predict(xgb.DMatrix(predict_x))
                 self.OffEvts.MVA.values[np.where((self.E_bins_off==E) & (self.Z_bins_off==Z))] = predict_y
 
-    def write_data_on(self, newfile=None, runNum=0):
+    def write_data(self, newfile=None, runNum=0):
         if newfile==None:
             base = os.path.splitext(self.filename)[0]
             newfile = base+"_xgb.root"
@@ -256,20 +256,29 @@ class PyVData:
             os.system("cp %s %s" % (self.filename, newfile))
         self.xgbfile = ROOT.TFile(newfile, "UPDATE");
         if runNum==0:
+            #here assuming that runOn and runOff have the same list of runs
             if not hasattr(self, 'runOn'):
                 self.get_run_on()
             for run_ in self.runOn:
-                self.write_data_on(runNum=run_)
+                self.write_data(runNum=run_)
         else:
             data_on_treeName = "run_"+str(runNum)+"/stereo/data_on"
             data_on = self.xgbfile.Get(data_on_treeName);
+            data_off_treeName = "run_"+str(runNum)+"/stereo/data_off"
+            data_off = self.Rfile.Get(data_off_treeName);
             mva_ = np.zeros(1, dtype=float)
+            mva_off_ = np.zeros(1, dtype=float)
             data_on.Branch('MVA', mva_, 'MVA/D')
+            data_off.Branch('MVA', mva_off_, 'MVA/D')
             for event in data_on:
-                mva_[0] = self.OnEvts.MVA.values[np.where(self.OnEvts.eventNumber==event.eventNumber)]
-                data_on.fill()
+                mva_[0] = self.OnEvts.MVA.values[np.where((self.OnEvts.eventNumber==event.eventNumber) & (self.OnEvts.runNumber==event.runNumber))]
+                data_on.Fill()
+            for event in data_off:
+                mva_off_[0] = self.OffEvts.MVA.values[np.where((self.OffEvts.eventNumber==event.eventNumber) & (self.OffEvts.runNumber==event.runNumber))]
+                data_off.Fill()
             self.xgbfile.Write()
             self.xgbfile.Close()
+
 
 def read_data(filename='BDT_1_1.txt', predict=False, scaler=None, fit_transform='linear'):
     if predict==True:
