@@ -270,8 +270,8 @@ class PyVData:
             mva_off_ = np.zeros(1, dtype=float)
             mva_onlist = np.zeros(data_on.GetEntries(), dtype=float)
             mva_offlist = np.zeros(data_off.GetEntries(), dtype=float)
-            Bran_MVAon = data_on.Branch('MVA', mva_, 'MVA/D')
-            Bran_MVAoff = data_off.Branch('MVA', mva_off_, 'MVA/D')
+            Bran_MVAon = data_on.Branch('xMVA', mva_, 'xMVA/D')
+            Bran_MVAoff = data_off.Branch('xMVA', mva_off_, 'xMVA/D')
             data_on.SetBranchStatus("*", 1)
             data_off.SetBranchStatus("*", 1)
             #for event in data_on:
