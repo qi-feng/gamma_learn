@@ -183,7 +183,7 @@ class PyVData:
             for i, event in enumerate(data_off):
                 time_index=np.argmax(ptTime>event.Time)
                 pointingData.GetEntry(time_index)
-                # coffvert some quantities to BDT input
+                # convert some quantities to BDT input
                 log10_EChi2S_ = np.log10(event.EChi2S);
                 log10_EmissionHeightChi2_ = np.log10(event.EmissionHeightChi2);
                 log10_SizeSecondMax_ = np.log10(event.SizeSecondMax);
@@ -193,7 +193,7 @@ class PyVData:
                 df_.eventNumber[i] = event.eventNumber
                 df_.MJD[i] = event.MJD
                 df_.Time[i] = event.Time
-                df_.Elevation[i] = pointingData.TelElevatioff
+                df_.Elevation[i] = pointingData.TelElevation
                 df_.theta2[i] = event.theta2
                 df_.MSCW[i] = event.MSCW
                 df_.MSCL[i] = event.MSCL
@@ -211,7 +211,7 @@ class PyVData:
             if not hasattr(self, 'OffEvts'):
                 self.OffEvts=df_
             else:
-                self.OffEvts=pd.coffcat([self.OffEvts, df_])
+                self.OffEvts=pd.concat([self.OffEvts, df_])
     def make_BDT_off(self):
         if not hasattr(self, 'OffEvts'):
             print "No data frame for off events found, running self.get_data_off() now!"
@@ -219,8 +219,8 @@ class PyVData:
         self.BDToff = self.OffEvts.drop(['Elevation','runNumber','eventNumber','MJD', 'Time', 'theta2', 'MVA', 'IsGamma'],axis=1)
         self.BDT_ErecS_off = self.OffEvts.ErecS
         self.BDT_Elevation_off = self.OffEvts.Elevation
-        self.E_bins_off=np.digitize(self.BDT_ErecS, self.E_grid)-1
-        self.Z_bins_off=np.digitize((90.-self.BDT_Elevation), self.Zen_grid)-1
+        self.E_bins_off=np.digitize(self.BDT_ErecS_off, self.E_grid)-1
+        self.Z_bins_off=np.digitize((90.-self.BDT_Elevation_off), self.Zen_grid)-1
     def predict_BDT_off(self, modelpath='.', modelbase='BDT', modelext='.model', scaler=None,fit_transform='linear'):
         if not hasattr(self, 'OffEvts'):
             print "No data frame for off events found, running self.get_data_off() now!"
@@ -237,8 +237,8 @@ class PyVData:
             self.BDToff = self.BDToff.astype(np.float32)
         # Now divide into bins in ErecS and Zen
         # Note that if ErecS>50TeV or Zen>75, ignore them (rare)
-        for E in np.unique(self.E_bins_off):
-        #for E in [0,1,2,3]:
+        #for E in np.unique(self.E_bins_off):
+        for E in [0,1,2,3]:
             for Z in np.unique(self.Z_bins_off):
                 predict_x = self.BDToff[np.where((self.E_bins_off==E) & (self.Z_bins_off==Z))]
                 modelname = modelpath+str('/')+modelbase+str(E)+str(Z)+modelext
