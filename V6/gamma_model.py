@@ -248,7 +248,28 @@ class PyVData:
                 predict_y = clf.predict(xgb.DMatrix(predict_x))
                 self.OffEvts.MVA.values[np.where((self.E_bins_off==E) & (self.Z_bins_off==Z))] = predict_y
 
-
+    def write_data_on(self, newfile=None, runNum=0):
+        if newfile==None:
+            base = os.path.splitext(self.filename)[0]
+            newfile = base+"_xgb.root"
+        if not os.path.isfile(newfile):
+            os.system("cp %s %s" % (self.filename, newfile))
+        self.xgbfile = ROOT.TFile(newfile, "UPDATE");
+        if runNum==0:
+            if not hasattr(self, 'runOn'):
+                self.get_run_on()
+            for run_ in self.runOn:
+                self.write_data_on(runNum=run_)
+        else:
+            data_on_treeName = "run_"+str(runNum)+"/stereo/data_on"
+            data_on = self.xgbfile.Get(data_on_treeName);
+            mva_ = np.zeros(1, dtype=float)
+            data_on.Branch('MVA', mva_, 'MVA/D')
+            for event in data_on:
+                mva_[0] = self.OnEvts.MVA.values[np.where(self.OnEvts.eventNumber==event.eventNumber)]
+                data_on.fill()
+            self.xgbfile.Write()
+            self.xgbfile.Close()
 
 def read_data(filename='BDT_1_1.txt', predict=False, scaler=None, fit_transform='linear'):
     if predict==True:
