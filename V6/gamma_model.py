@@ -279,9 +279,10 @@ class PyVData:
             for i in range(data_on.GetEntries()):
                 data_on.GetEntry(i)
                 mva_[0] = self.OnEvts.MVA.values[np.where((self.OnEvts.eventNumber==data_on.eventNumber) & (self.OnEvts.runNumber==data_on.runNumber))]
+                mva_[0] = 1
                 #mva_onlist[i] = self.OnEvts.MVA.values[np.where((self.OnEvts.eventNumber==data_on.eventNumber) & (self.OnEvts.runNumber==data_on.runNumber))]
-                #data_on.Fill()
-                Bran_MVAon.Fill()
+                data_on.Fill()
+                #Bran_MVAon.Fill()
             #for i in range(data_on.GetEntries()):
             #    mva_[0] = mva_onlist[i]
             #    data_on.Fill()
@@ -291,11 +292,13 @@ class PyVData:
                 mva_off_[0] = self.OffEvts.MVA.values[np.where((self.OffEvts.eventNumber==data_off.eventNumber) & (self.OffEvts.runNumber==data_off.runNumber))]
                 #mva_offlist[i] = self.OffEvts.MVA.values[np.where((self.OffEvts.eventNumber==data_off.eventNumber) & (self.OffEvts.runNumber==data_off.runNumber))]
                 #mva_off_[0] = self.OffEvts.MVA.values[np.where((self.OffEvts.eventNumber==event.eventNumber) & (self.OffEvts.runNumber==event.runNumber))]
-                #data_off.Fill()
-                Bran_MVAoff.Fill()
+                data_off.Fill()
+                #Bran_MVAoff.Fill()
             #for i in range(data_off.GetEntries()):
             #    mva_off_[0] = mva_offlist[i]
             #    data_off.Fill()
+            data_on.AutoSave()
+            data_off.AutoSave()
             data_on.Write()
             data_off.Write()
             self.xgbfile.Write()
