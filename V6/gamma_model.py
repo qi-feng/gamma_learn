@@ -115,7 +115,7 @@ class PyVData:
         if not hasattr(self, 'OnEvts'):
             print "No data frame for on events found, running self.get_data_on() now!"
             self.get_data_on()
-        self.BDTon = self.OnEvts.drop(['runNumber','eventNumber','MJD', 'Time', 'theta2', 'MVA', 'IsGamma'],axis=1)
+        self.BDTon = self.OnEvts.drop(['Elevation','runNumber','eventNumber','MJD', 'Time', 'theta2', 'MVA', 'IsGamma'],axis=1)
         self.BDT_ErecS = self.OnEvts.ErecS
         self.BDT_Elevation = self.OnEvts.Elevation
         self.E_bins=np.digitize(self.BDT_ErecS, self.E_grid)-1
@@ -144,8 +144,8 @@ class PyVData:
                 print "Using model %s" % modelname
                 clf = xgb.Booster() #init model
                 clf.load_model(modelname) # load model
-                predict_y = clf.predict(predict_x)
-
+                predict_y = clf.predict(xgb.DMatrix(predict_x))
+                self.OnEvts.MVA.values[np.where((self.E_bins==E) & (self.Z_bins==Z))] = predict_y
 
 
 
@@ -172,6 +172,9 @@ def read_data(filename='BDT_1_1.txt', predict=False, scaler=None, fit_transform=
                   'NImages','Xoff','Yoff','ErecS','weight','BDT_0',]
     scaler = StandardScaler()
     #x = np.array(data.drop(['classID','className','BDT_0'],axis=1).values)
+    # x has columns: ['MSCW','MSCL','log10_EChi2S_','EmissionHeight',
+    #              'log10_EmissionHeightChi2_','log10_SizeSecondMax_','sqrt_Xcore_T_Xcore_P_Ycore_T_Ycore_',
+    #              'NImages','Xoff','Yoff','ErecS']
     x = np.array(data.drop(['classID','className','weight','BDT_0'],axis=1).values)
     if fit_transform=='log':
         print "log transform the input features"
