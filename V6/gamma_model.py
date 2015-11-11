@@ -139,13 +139,114 @@ class PyVData:
         #for E in np.unique(self.E_bins):
         for E in [0,1,2,3]:
             for Z in np.unique(self.Z_bins):
-                predict_x = self.BDTon.values[np.where((self.E_bins==E) & (self.Z_bins==Z))]
+                predict_x = self.BDTon[np.where((self.E_bins==E) & (self.Z_bins==Z))]
                 modelname = modelpath+str('/')+modelbase+str(E)+str(Z)+modelext
                 print "Using model %s" % modelname
                 clf = xgb.Booster() #init model
                 clf.load_model(modelname) # load model
                 predict_y = clf.predict(xgb.DMatrix(predict_x))
                 self.OnEvts.MVA.values[np.where((self.E_bins==E) & (self.Z_bins==Z))] = predict_y
+    def get_run_off(self):
+        self.runOff = []
+        runSum = self.Rfile.Get("total_1/stereo/tRunSummary");
+        for event in runSum:
+            if event.runOff > 0:
+                self.runOff.append(event.runOff)
+        if not self.runOff:
+            print "No runs found in data_off tree! "
+            raise RuntimeError
+    def get_data_off(self, runNum=0):
+        if runNum==0:
+            if not hasattr(self, 'runOff'):
+                self.get_run_off()
+            for run_ in self.runOff:
+                self.get_data_off(runNum=run_)
+        else:
+            if not hasattr(self, 'Rfile'):
+                print "No file has been read. Run self.readEDfile(filename=\"rootfile\") first. "
+                raise
+            data_off_treeName = "run_"+str(runNum)+"/stereo/data_off"
+            pointingData_treeName = "run_"+str(runNum)+"/stereo/pointingDataReduced"
+            data_off = self.Rfile.Get(data_off_treeName);
+            pointingData = self.Rfile.Get(pointingData_treeName);
+            ptTime=[]
+            for ptd in pointingData:
+                ptTime.append(ptd.Time);
+            ptTime=np.array(ptTime)
+            columns=['runNumber','eventNumber', 'MJD', 'Time', 'Elevation', 'theta2',
+                     'MSCW','MSCL','log10_EChi2S_','EmissionHeight',
+                     'log10_EmissionHeightChi2_','log10_SizeSecondMax_',
+                     'sqrt_Xcore_T_Xcore_P_Ycore_T_Ycore_', 'NImages','Xoff','Yoff',
+                     'ErecS', 'MVA', 'IsGamma']
+            df_ = pd.DataFrame(np.array([np.zeros(data_off.GetEntries())]*len(columns)).T,
+                               columns=columns)
+            for i, event in enumerate(data_off):
+                time_index=np.argmax(ptTime>event.Time)
+                pointingData.GetEntry(time_index)
+                # coffvert some quantities to BDT input
+                log10_EChi2S_ = np.log10(event.EChi2S);
+                log10_EmissionHeightChi2_ = np.log10(event.EmissionHeightChi2);
+                log10_SizeSecondMax_ = np.log10(event.SizeSecondMax);
+                sqrt_Xcore_T_Xcore_P_Ycore_T_Ycore_ = np.sqrt(event.Xcore*event.Xcore + event.Ycore*event.Ycore);
+                # fill the pandas dataframe
+                df_.runNumber[i] = event.runNumber
+                df_.eventNumber[i] = event.eventNumber
+                df_.MJD[i] = event.MJD
+                df_.Time[i] = event.Time
+                df_.Elevation[i] = pointingData.TelElevatioff
+                df_.theta2[i] = event.theta2
+                df_.MSCW[i] = event.MSCW
+                df_.MSCL[i] = event.MSCL
+                df_.ErecS[i] = event.ErecS
+                df_.log10_EChi2S_[i] = log10_EChi2S_
+                df_.log10_EmissionHeightChi2_[i] = log10_EmissionHeightChi2_
+                df_.log10_SizeSecondMax_[i] = log10_SizeSecondMax_
+                df_.sqrt_Xcore_T_Xcore_P_Ycore_T_Ycore_[i] = sqrt_Xcore_T_Xcore_P_Ycore_T_Ycore_
+                # NImages, Xoff, Yoff not used:
+                df_.NImages[i] = 0.0
+                df_.Xoff[i] = 0.0
+                df_.Yoff[i] = 0.0
+                df_.IsGamma[i] = event.IsGamma
+                df_.MVA[i] = 0.0
+            if not hasattr(self, 'OffEvts'):
+                self.OffEvts=df_
+            else:
+                self.OffEvts=pd.coffcat([self.OffEvts, df_])
+    def make_BDT_off(self):
+        if not hasattr(self, 'OffEvts'):
+            print "No data frame for off events found, running self.get_data_off() now!"
+            self.get_data_off()
+        self.BDToff = self.OffEvts.drop(['Elevation','runNumber','eventNumber','MJD', 'Time', 'theta2', 'MVA', 'IsGamma'],axis=1)
+        self.BDT_ErecS_off = self.OffEvts.ErecS
+        self.BDT_Elevation_off = self.OffEvts.Elevation
+        self.E_bins_off=np.digitize(self.BDT_ErecS, self.E_grid)-1
+        self.Z_bins_off=np.digitize((90.-self.BDT_Elevation), self.Zen_grid)-1
+    def predict_BDT_off(self, modelpath='.', modelbase='BDT', modelext='.model', scaler=Noffe,fit_transform='linear'):
+        if not hasattr(self, 'OffEvts'):
+            print "No data frame for off events found, running self.get_data_off() now!"
+            self.get_data_off()
+        if not scaler:
+            print "Warning: scaler not provided for prediction data!"
+            scaler = StandardScaler()
+        if fit_transform=='log':
+            print "log transform the input features"
+            self.BDToff = scaler.fit_transform(np.log(self.BDToff + 1.)).astype(np.float32)
+        elif fit_transform=='linear':
+            self.BDToff = scaler.fit_transform(self.BDToff).astype(np.float32)
+        else:
+            self.BDToff = self.BDToff.astype(np.float32)
+        # Now divide into bins in ErecS and Zen
+        # Note that if ErecS>50TeV or Zen>75, ignore them (rare)
+        for E in np.unique(self.E_bins_off):
+        #for E in [0,1,2,3]:
+            for Z in np.unique(self.Z_bins_off):
+                predict_x = self.BDToff[np.where((self.E_bins_off==E) & (self.Z_bins_off==Z))]
+                modelname = modelpath+str('/')+modelbase+str(E)+str(Z)+modelext
+                print "Using model %s" % modelname
+                clf = xgb.Booster() #init model
+                clf.load_model(modelname) # load model
+                predict_y = clf.predict(xgb.DMatrix(predict_x))
+                self.OffEvts.MVA.values[np.where((self.E_bins_off==E) & (self.Z_bins_off==Z))] = predict_y
 
 
 
