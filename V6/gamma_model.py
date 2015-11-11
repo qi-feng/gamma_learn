@@ -265,16 +265,24 @@ class PyVData:
             data_on_treeName = "run_"+str(runNum)+"/stereo/data_on"
             data_on = self.xgbfile.Get(data_on_treeName);
             data_off_treeName = "run_"+str(runNum)+"/stereo/data_off"
-            data_off = self.Rfile.Get(data_off_treeName);
+            data_off = self.xgbfile.Get(data_off_treeName);
             mva_ = np.zeros(1, dtype=float)
             mva_off_ = np.zeros(1, dtype=float)
             data_on.Branch('MVA', mva_, 'MVA/D')
             data_off.Branch('MVA', mva_off_, 'MVA/D')
-            for event in data_on:
-                mva_[0] = self.OnEvts.MVA.values[np.where((self.OnEvts.eventNumber==event.eventNumber) & (self.OnEvts.runNumber==event.runNumber))]
+            data_on.SetBranchStatus("*", 1)
+            data_off.SetBranchStatus("*", 1)
+            #for event in data_on:
+            #    mva_[0] = self.OnEvts.MVA.values[np.where((self.OnEvts.eventNumber==event.eventNumber) & (self.OnEvts.runNumber==event.runNumber))]
+            for i in range(data_on.GetEntries()):
+                data_on.GetEntry(i)
+                mva_[0] = self.OnEvts.MVA.values[np.where((self.OnEvts.eventNumber==data_on.eventNumber) & (self.OnEvts.runNumber==data_on.runNumber))]
                 data_on.Fill()
-            for event in data_off:
-                mva_off_[0] = self.OffEvts.MVA.values[np.where((self.OffEvts.eventNumber==event.eventNumber) & (self.OffEvts.runNumber==event.runNumber))]
+            #for event in data_off:
+            for i in range(data_off.GetEntries()):
+                data_off.GetEntry(i)
+                mva_off_[0] = self.OffEvts.MVA.values[np.where((self.OffEvts.eventNumber==data_off.eventNumber) & (self.OffEvts.runNumber==data_off.runNumber))]
+                #mva_off_[0] = self.OffEvts.MVA.values[np.where((self.OffEvts.eventNumber==event.eventNumber) & (self.OffEvts.runNumber==event.runNumber))]
                 data_off.Fill()
             self.xgbfile.Write()
             self.xgbfile.Close()
