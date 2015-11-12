@@ -280,6 +280,9 @@ class PyVMSCWData:
         df_ = pd.DataFrame(np.array([np.zeros(data.GetEntries())]*len(columns)).T,
                            columns=columns)
         for i, event in enumerate(data):
+            Nlog=10000
+            if (i % Nlog) == 0:
+                print str(Nlog)+" read..."
             # get index of event time in pointingData tree
             time_index=np.argmax(ptTime>event.Time)
             pointingData.GetEntry(time_index)
@@ -335,6 +338,10 @@ class PyVMSCWData:
             self.BDT = scaler.fit_transform(self.BDT).astype(np.float32)
         else:
             self.BDT = self.BDT.astype(np.float32)
+        # Deal with NaN and Inf:
+        self.BDT = self.BDT.replace([np.inf, -np.inf], np.nan)
+        self.BDT = self.BDT.fillna(0)
+
         # Now divide into bins in ErecS and Zen
         # Note that if ErecS>50TeV or Zen>75, put them in the highest bin (bias! but rare)
         #for E in np.unique(self.E_bins):
