@@ -282,7 +282,7 @@ class PyVMSCWData:
         for i, event in enumerate(data):
             Nlog=10000
             if (i % Nlog) == 0:
-                print str(Nlog)+" read..."
+                print str(i)+" read..."
             # get index of event time in pointingData tree
             time_index=np.argmax(ptTime>event.Time)
             pointingData.GetEntry(time_index)
@@ -320,6 +320,10 @@ class PyVMSCWData:
             print "No data frame for on events found, running self.get_data() now!"
             self.get_data()
         self.BDT = self.EventsDF.drop(['Elevation','runNumber','eventNumber','MJD', 'Time', 'theta2', 'MVA', 'IsGamma'],axis=1)
+        # Deal with NaN and Inf:
+        self.BDT = self.BDT.replace([np.inf, -np.inf], np.nan)
+        self.BDT = self.BDT.fillna(0)
+
         self.BDT_ErecS = self.EventsDF.ErecS
         self.BDT_Elevation = self.EventsDF.Elevation
         self.E_bins=np.digitize(self.BDT_ErecS, self.E_grid)-1
@@ -339,8 +343,8 @@ class PyVMSCWData:
         else:
             self.BDT = self.BDT.astype(np.float32)
         # Deal with NaN and Inf:
-        self.BDT = self.BDT.replace([np.inf, -np.inf], np.nan)
-        self.BDT = self.BDT.fillna(0)
+        #self.BDT = self.BDT.replace([np.inf, -np.inf], np.nan)
+        #self.BDT = self.BDT.fillna(0)
 
         # Now divide into bins in ErecS and Zen
         # Note that if ErecS>50TeV or Zen>75, put them in the highest bin (bias! but rare)
