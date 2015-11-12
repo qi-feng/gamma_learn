@@ -282,7 +282,7 @@ class PyVMSCWData:
         for i, event in enumerate(data):
             Nlog=10000
             if (i % Nlog) == 0:
-                print str(i)+" read..."
+                print str(i)+" events read..."
             # get index of event time in pointingData tree
             time_index=np.argmax(ptTime>event.Time)
             pointingData.GetEntry(time_index)
@@ -371,19 +371,18 @@ class PyVMSCWData:
           "struct RFStruct{\
             Int_t runNumber;\
             Int_t eventNumber;\
-            Int_t icut = 1;\
-            UInt_t Ng = 1;\
-            Double_t g[1] = {0};\
+            Int_t icut;\
+            UInt_t Ng;\
+            Double_t g[1];\
           };")
-        rfTree = TTree('rfTree','rf cuts tree')
+        rfTree = ROOT.TTree('rfTree','rf cuts tree')
         # Create branches in the rf tree
-        rf = RFStruct()
-        t.Branch('rootInt',AddressOf(s,'someInt'),'someInt/I')
-        rfTree.Branch( "runNumber", AddressOf(rf, 'runNumber'), "runNumber/I" )
-        rfTree.Branch( "eventNumber", AddressOf(rf, 'eventNumber'), "eventNumber/I" );
-        rfTree.Branch( "cut", AddressOf(rf, 'icut'),"cut/I" );
-        rfTree.Branch( "Ng", AddressOf(rf, 'Ng'), "Ng/i" );
-        rfTree.Branch( "g", AddressOf(rf, 'g'), "g[Ng]/D" );
+        rf = ROOT.RFStruct()
+        rfTree.Branch( "runNumber", ROOT.AddressOf(rf, 'runNumber'), "runNumber/I" )
+        rfTree.Branch( "eventNumber", ROOT.AddressOf(rf, 'eventNumber'), "eventNumber/I" );
+        rfTree.Branch( "cut", ROOT.AddressOf(rf, 'icut'),"cut/I" );
+        rfTree.Branch( "Ng", ROOT.AddressOf(rf, 'Ng'), "Ng/i" );
+        rfTree.Branch( "g", ROOT.AddressOf(rf, 'g'), "g[Ng]/D" );
         #rfTree->Branch( "runNumber", &runNumber, "runNumber/I" );
         #rfTree->Branch( "eventNumber", &eventNumber, "eventNumber/I" );
         #rfTree->Branch( "cut", &icut,"cut/I" );
@@ -396,7 +395,7 @@ class PyVMSCWData:
             rf.eventNumber = self.EventsDF.eventNumber.values[i]
             rf.icut = 1
             rf.Ng = 1
-            rf.g =  self.EventsDF.IsGamma.values[i]
+            rf.g[0] =  self.EventsDF.IsGamma.values[i]
             rfTree.Fill()
         #data_on.AutoSave()
         #data_on.Write()
