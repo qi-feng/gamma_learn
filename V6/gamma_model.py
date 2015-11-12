@@ -31,19 +31,18 @@ import seaborn as sns
 
 import ROOT
 
-class PyVData:
+class PyVAnaSumData:
     ############################################################################
     #                       Initialization of the object.                      #
     ############################################################################
-    def __init__(self, filename="Crab_V6_BDTModerate.RE.root", package='ED'):
-        self.package=package
+    def __init__(self, filename="Crab_V6_BDTModerate.RE.root"):
         self.E_grid=np.array([0.08, 0.32, 0.5, 1.0, 50.0])
         self.Zen_grid=np.array([0.0, 25.0, 32.5, 42.5, 75.])
         if filename:
             self.filename = filename
-            self.readEDfile(filename=filename)
+            self.readEDfile(filename)
             #
-    def readEDfile(self,filename="Crab_V6_BDTModerate.RE.root"):
+    def readEDfile(self,filename):
         self.Rfile = ROOT.TFile(filename, "read");
     def get_run_on(self):
         self.runOn = []
@@ -62,7 +61,7 @@ class PyVData:
                 self.get_data_on(runNum=run_)
         else:
             if not hasattr(self, 'Rfile'):
-                print "No file has been read. Run self.readEDfile(filename=\"rootfile\") first. "
+                print "No file has been read. Run self.readEDfile(\"rootfile\") first. "
                 raise
             data_on_treeName = "run_"+str(runNum)+"/stereo/data_on"
             pointingData_treeName = "run_"+str(runNum)+"/stereo/pointingDataReduced"
@@ -163,7 +162,7 @@ class PyVData:
                 self.get_data_off(runNum=run_)
         else:
             if not hasattr(self, 'Rfile'):
-                print "No file has been read. Run self.readEDfile(filename=\"rootfile\") first. "
+                print "No file has been read. Run self.readEDfile(\"rootfile\") first. "
                 raise
             data_off_treeName = "run_"+str(runNum)+"/stereo/data_off"
             pointingData_treeName = "run_"+str(runNum)+"/stereo/pointingDataReduced"
@@ -248,64 +247,150 @@ class PyVData:
                 predict_y = clf.predict(xgb.DMatrix(predict_x))
                 self.OffEvts.MVA.values[np.where((self.E_bins_off==E) & (self.Z_bins_off==Z))] = predict_y
 
-    def write_data(self, newfile=None, runNum=0):
-        if newfile==None:
-            base = os.path.splitext(self.filename)[0]
-            newfile = base+"_xgb.root"
-        if not os.path.isfile(newfile):
-            os.system("cp %s %s" % (self.filename, newfile))
-        self.xgbfile = ROOT.TFile(newfile, "UPDATE");
-        if runNum==0:
-            #here assuming that runOn and runOff have the same list of runs
-            if not hasattr(self, 'runOn'):
-                self.get_run_on()
-            for run_ in self.runOn:
-                self.write_data(runNum=run_)
+class PyVMSCWData:
+    ############################################################################
+    #                       Initialization of the object.                      #
+    ############################################################################
+    def __init__(self, filename="64080.mscw.root"):
+        self.E_grid=np.array([0.08, 0.32, 0.5, 1.0, 50.0])
+        self.Zen_grid=np.array([0.0, 25.0, 32.5, 42.5, 75.])
+        if filename:
+            self.filename = filename
+            self.readEDfile(filename)
+            #
+    def readEDfile(self,filename):
+        try:
+            self.Rfile = ROOT.TFile(filename, "read");
+        except:
+            print "Unable to open root file", self.filename
+    def get_data(self):
+        if not hasattr(self, 'Rfile'):
+            self.readEDfile(self.filename)
+        data = self.Rfile.Get('data');
+        pointingData = self.Rfile.Get('pointingDataReduced');
+        ptTime=[]
+        for ptd in pointingData:
+            ptTime.append(ptd.Time);
+        ptTime=np.array(ptTime)
+        columns=['runNumber','eventNumber', 'MJD', 'Time', 'Elevation', 'theta2',
+                 'MSCW','MSCL','log10_EChi2S_','EmissionHeight',
+                 'log10_EmissionHeightChi2_','log10_SizeSecondMax_',
+                 'sqrt_Xcore_T_Xcore_P_Ycore_T_Ycore_', 'NImages','Xoff','Yoff',
+                 'ErecS', 'MVA', 'IsGamma']
+        df_ = pd.DataFrame(np.array([np.zeros(data.GetEntries())]*len(columns)).T,
+                           columns=columns)
+        for i, event in enumerate(data):
+            # get index of event time in pointingData tree
+            time_index=np.argmax(ptTime>event.Time)
+            pointingData.GetEntry(time_index)
+            # convert some quantities to BDT input
+            log10_EChi2S_ = np.log10(event.EChi2S);
+            log10_EmissionHeightChi2_ = np.log10(event.EmissionHeightChi2);
+            log10_SizeSecondMax_ = np.log10(event.SizeSecondMax);
+            sqrt_Xcore_T_Xcore_P_Ycore_T_Ycore_ = np.sqrt(event.Xcore*event.Xcore + event.Ycore*event.Ycore);
+            # fill the pandas dataframe
+            df_.runNumber[i] = event.runNumber
+            df_.eventNumber[i] = event.eventNumber
+            df_.MJD[i] = event.MJD
+            df_.Time[i] = event.Time
+            df_.Elevation[i] = pointingData.TelElevation
+            df_.theta2[i] = event.theta2
+            df_.MSCW[i] = event.MSCW
+            df_.MSCL[i] = event.MSCL
+            df_.ErecS[i] = event.ErecS
+            df_.log10_EChi2S_[i] = log10_EChi2S_
+            df_.log10_EmissionHeightChi2_[i] = log10_EmissionHeightChi2_
+            df_.log10_SizeSecondMax_[i] = log10_SizeSecondMax_
+            df_.sqrt_Xcore_T_Xcore_P_Ycore_T_Ycore_[i] = sqrt_Xcore_T_Xcore_P_Ycore_T_Ycore_
+            # NImages, Xoff, Yoff not used:
+            df_.NImages[i] = 0.0
+            df_.Xoff[i] = 0.0
+            df_.Yoff[i] = 0.0
+            df_.IsGamma[i] = 0.0
+            df_.MVA[i] = 0.0
+        if not hasattr(self, 'EventsDF'):
+            self.EventsDF=df_
+        #else:
+        #    self.EventsDF=pd.concat([self.EventsDF, df_])
+    def make_BDT(self):
+        if not hasattr(self, 'EventsDF'):
+            print "No data frame for on events found, running self.get_data() now!"
+            self.get_data()
+        self.BDT = self.EventsDF.drop(['Elevation','runNumber','eventNumber','MJD', 'Time', 'theta2', 'MVA', 'IsGamma'],axis=1)
+        self.BDT_ErecS = self.EventsDF.ErecS
+        self.BDT_Elevation = self.EventsDF.Elevation
+        self.E_bins=np.digitize(self.BDT_ErecS, self.E_grid)-1
+        self.Z_bins=np.digitize((90.-self.BDT_Elevation), self.Zen_grid)-1
+    def predict_BDT(self, modelpath='.', modelbase='BDT', modelext='.model', scaler=None,fit_transform='linear'):
+        if not hasattr(self, 'EventsDF'):
+            print "No data frame for on events found, running self.get_data() now!"
+            self.get_data()
+        if not scaler:
+            print "Warning: scaler not provided for prediction data!"
+            scaler = StandardScaler()
+        if fit_transform=='log':
+            print "log transform the input features"
+            self.BDT = scaler.fit_transform(np.log(self.BDT + 1.)).astype(np.float32)
+        elif fit_transform=='linear':
+            self.BDT = scaler.fit_transform(self.BDT).astype(np.float32)
         else:
-            data_on_treeName = "run_"+str(runNum)+"/stereo/data_on"
-            data_on = self.xgbfile.Get(data_on_treeName);
-            data_off_treeName = "run_"+str(runNum)+"/stereo/data_off"
-            data_off = self.xgbfile.Get(data_off_treeName);
-            mva_ = np.zeros(1, dtype=float)
-            mva_off_ = np.zeros(1, dtype=float)
-            mva_onlist = np.zeros(data_on.GetEntries(), dtype=float)
-            mva_offlist = np.zeros(data_off.GetEntries(), dtype=float)
-            #Bran_MVAon = data_on.Branch('xMVA', mva_, 'xMVA/D')
-            #Bran_MVAoff = data_off.Branch('xMVA', mva_off_, 'xMVA/D')
-            data_on.Branch('MVA', mva_, 'MVA/D')
-            data_off.Branch('MVA', mva_off_, 'MVA/D')
-            data_on.SetBranchStatus("*", 1)
-            data_off.SetBranchStatus("*", 1)
-            #for event in data_on:
-            #    mva_[0] = self.OnEvts.MVA.values[np.where((self.OnEvts.eventNumber==event.eventNumber) & (self.OnEvts.runNumber==event.runNumber))]
-            for i in range(data_on.GetEntries()):
-                #data_on.GetEntry(i)
-                #mva_[0] = self.OnEvts.MVA.values[np.where((self.OnEvts.eventNumber==data_on.eventNumber) & (self.OnEvts.runNumber==data_on.runNumber))]
-                mva_[0] = 1
-                #mva_onlist[i] = self.OnEvts.MVA.values[np.where((self.OnEvts.eventNumber==data_on.eventNumber) & (self.OnEvts.runNumber==data_on.runNumber))]
-                data_on.Fill()
-                #Bran_MVAon.Fill()
-            #for i in range(data_on.GetEntries()):
-            #    mva_[0] = mva_onlist[i]
-            #    data_on.Fill()
-            #for event in data_off:
-            for i in range(data_off.GetEntries()):
-                #data_off.GetEntry(i)
-                #mva_off_[0] = self.OffEvts.MVA.values[np.where((self.OffEvts.eventNumber==data_off.eventNumber) & (self.OffEvts.runNumber==data_off.runNumber))]
-                mva_off_[0] = self.OffEvts.MVA.values[i]
-                ##mva_offlist[i] = self.OffEvts.MVA.values[np.where((self.OffEvts.eventNumber==data_off.eventNumber) & (self.OffEvts.runNumber==data_off.runNumber))]
-                ##mva_off_[0] = self.OffEvts.MVA.values[np.where((self.OffEvts.eventNumber==event.eventNumber) & (self.OffEvts.runNumber==event.runNumber))]
-                data_off.Fill()
-                #Bran_MVAoff.Fill()
-            #for i in range(data_off.GetEntries()):
-            #    mva_off_[0] = mva_offlist[i]
-            #    data_off.Fill()
-            data_on.AutoSave()
-            data_off.AutoSave()
-            data_on.Write()
-            data_off.Write()
-            self.xgbfile.Write()
-            self.xgbfile.Close()
+            self.BDT = self.BDT.astype(np.float32)
+        # Now divide into bins in ErecS and Zen
+        # Note that if ErecS>50TeV or Zen>75, put them in the highest bin (bias! but rare)
+        #for E in np.unique(self.E_bins):
+        for E in [0,1,2,3]:
+            for Z in np.unique(self.Z_bins):
+                predict_x = self.BDT[np.where((self.E_bins==E) & (self.Z_bins==Z))]
+                modelname = modelpath+str('/')+modelbase+str(E)+str(Z)+modelext
+                print "Using model %s" % modelname
+                clf = xgb.Booster() #init model
+                clf.load_model(modelname) # load model
+                predict_y = clf.predict(xgb.DMatrix(predict_x))
+                self.EventsDF.MVA.values[np.where((self.E_bins==E) & (self.Z_bins==Z))] = predict_y
+                # !!! fill the gamma/hadron flag, use a simple 0.5 for now !!!
+                self.EventsDF.IsGamma.values[np.where((self.E_bins==E) & (self.Z_bins==Z))] = (predict_y>0.5).astype(np.float)
+    def write_RFtree(self, runNum=None):
+        if runNum==None:
+            runNum=self.filename.split('/')[-1].split('.')[0]
+        newfile = str(runNum)+".mscw.rf.root"
+        print "Creating a root file "+str(newfile)+"."
+        self.xgbfile = ROOT.TFile(newfile, "RECREATE");
+        # Create rf struct
+        ROOT.gROOT.ProcessLine(\
+          "struct RFStruct{\
+            Int_t runNumber;\
+            Int_t eventNumber;\
+            Int_t icut = 1;\
+            UInt_t Ng = 1;\
+            Double_t g[1] = {0};\
+          };")
+        rfTree = TTree('rfTree','rf cuts tree')
+        # Create branches in the rf tree
+        rf = RFStruct()
+        t.Branch('rootInt',AddressOf(s,'someInt'),'someInt/I')
+        rfTree.Branch( "runNumber", AddressOf(rf, 'runNumber'), "runNumber/I" )
+        rfTree.Branch( "eventNumber", AddressOf(rf, 'eventNumber'), "eventNumber/I" );
+        rfTree.Branch( "cut", AddressOf(rf, 'icut'),"cut/I" );
+        rfTree.Branch( "Ng", AddressOf(rf, 'Ng'), "Ng/i" );
+        rfTree.Branch( "g", AddressOf(rf, 'g'), "g[Ng]/D" );
+        #rfTree->Branch( "runNumber", &runNumber, "runNumber/I" );
+        #rfTree->Branch( "eventNumber", &eventNumber, "eventNumber/I" );
+        #rfTree->Branch( "cut", &icut,"cut/I" );
+        #rfTree->Branch( "Ng", &Ng, "Ng/i" );
+        #rfTree->Branch( "g", g, "g[Ng]/D" );
+
+        # Fill rf tree
+        for i in range(len(self.EventsDF.index)):
+            rf.runNumber = self.EventsDF.runNumber.values[i]
+            rf.eventNumber = self.EventsDF.eventNumber.values[i]
+            rf.icut = 1
+            rf.Ng = 1
+            rf.g =  self.EventsDF.IsGamma.values[i]
+            rfTree.Fill()
+        #data_on.AutoSave()
+        #data_on.Write()
+        self.xgbfile.Write()
+        self.xgbfile.Close()
 
 
 def read_data(filename='BDT_1_1.txt', predict=False, scaler=None, fit_transform='linear'):
