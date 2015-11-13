@@ -375,7 +375,7 @@ class PyVMSCWData:
             UInt_t Ng;\
             Double_t g[1];\
           };")
-        rfTree = ROOT.TTree('rfTree','rf cuts tree')
+        rfTree = ROOT.TTree('rf','rf cuts tree')
         # Create branches in the rf tree
         rf = ROOT.RFStruct()
         rfTree.Branch( "runNumber", ROOT.AddressOf(rf, 'runNumber'), "runNumber/I" )
