@@ -751,32 +751,100 @@ def print_best_xgb(lfile, num=8):
     pd.set_option('display.width', 1000)
     print df_.sort(columns='best_score', ascending=False).head(num)
 
-def plot_pseudo_TMVA(model_file="BDT11.model", train_file="V6/BDT_1_1_V6.txt", test_file="V6/BDT_1_1_Test_V6.txt", ifKDE=False, outfile='BDT_1_1_xgb_counts.png', nbins=40):
+def plot_pseudo_TMVA(model_file="BDT11.model", train_file="V6/BDT_1_1_V6.txt", test_file="V6/BDT_1_1_Test_V6.txt",
+                     ifKDE=False, outfile='BDT_1_1_xgb', nbins=40, plot_roc=True, plot_tmva_roc=True, norm_hist=True):
     clf = xgb.Booster() #init model
     clf.load_model(model_file) # load data
     train_x, train_y =read_data_xgb(train_file, predict=True)
     test_x, test_y =read_data_xgb(test_file, predict=True)
     predict_train_y = clf.predict(train_x)
     predict_test_y = clf.predict(test_x)
+    plt.figure()
     sns.distplot(predict_train_y[np.where(train_y==1)]*2.-1.,
-                 bins=nbins, hist=True, kde=ifKDE, rug=False, 
+                 bins=nbins, hist=True, kde=ifKDE, rug=False,
                  hist_kws={"histtype": "step", "linewidth": 1,
-                           "alpha": 1, "color": "darkblue"}, 
-                 label="Training Signal")
+                           "alpha": 1, "color": "darkblue"},
+                 label="Training Signal", norm_hist=norm_hist)
     sns.distplot(predict_train_y[np.where(train_y==0)]*2.-1.,
-                 bins=nbins, hist=True, kde=ifKDE, rug=False, 
+                 bins=nbins, hist=True, kde=ifKDE, rug=False,
                  hist_kws={"histtype": "step", "linewidth": 1,
                            "alpha": 1, "color": "darkred"},
-                 label="Training Background")
+                 label="Training Background", norm_hist=norm_hist)
     sns.distplot(predict_test_y[np.where(test_y==1)]*2.-1.,
-                 color='b', bins=nbins, hist=True, kde=ifKDE, rug=False, 
-                 label="Test Signal")
+                 color='b', bins=nbins, hist=True, kde=ifKDE, rug=False,
+                 label="Test Signal", norm_hist=norm_hist)
     sns.distplot(predict_test_y[np.where(test_y==0)]*2.-1.,
-                 color='r', bins=nbins, hist=True, kde=ifKDE, rug=False, 
-                 label="Test Background")
-    sns.axlabel("Pseudo TMVA value","Event counts")
+                 color='r', bins=nbins, hist=True, kde=ifKDE, rug=False,
+                 label="Test Background", norm_hist=norm_hist)
     plt.legend(loc='best');
-    plt.savefig(outfile, format='png', dpi=1000)
+    if norm_hist:
+        sns.axlabel("Pseudo TMVA value","Normalized event counts")
+        plt.savefig(outfile+'normed_counts.png', format='png', dpi=500)
+    else:
+        sns.axlabel("Pseudo TMVA value","Event counts")
+        plt.savefig(outfile+'counts.png', format='png', dpi=500)
+    # Compute ROC curve and ROC area
+    # roc_auc = dict()
+    fpr, tpr, thresh = roc_curve(train_y,predict_train_y)
+    roc_auc = auc(fpr, tpr)
+    fpr_test, tpr_test, thresh_test = roc_curve(test_y,predict_test_y)
+    roc_auc_test = auc(fpr_test, tpr_test)
+    print 'The training AUC score is {0}, and the test AUC score is: {1}'.format(
+            roc_auc, roc_auc_test)
+    if(plot_roc==True):
+        # Plot ROC curve
+        plt.figure()
+        plt.plot(fpr, tpr, label='training ROC curve (area = %0.2f)' % roc_auc)
+        plt.plot(fpr_test, tpr_test, label='testing ROC curve (area = %0.2f)' % roc_auc_test)
+        plt.plot([0, 1], [0, 1], 'k--')
+        plt.xlim([0.0, 1.0])
+        plt.ylim([0.0, 1.05])
+        plt.xlabel('False Positive Rate')
+        plt.ylabel('True Positive Rate')
+        plt.title('Receiver operating characteristic curve')
+        plt.legend(loc="lower right")
+        plt.tight_layout()
+        #plt.savefig(os.path.splitext(outfile)[0]+'_ROC.png', format='png', dpi=1000)
+        plt.savefig(outfile+'_ROC.png', format='png', dpi=500)
+
+    if(plot_tmva_roc==True):
+        # Plot TMVA ROC curve
+        plt.figure(figsize=(6, 6))
+        thresh_IsGamma=0.9
+        #thresh_index=np.argmax(tpr_test>=thresh_IsGamma)
+        #ratio_tpr_fpr=np.array(tpr_test/fpr_test)
+        #ratio_tpr_fpr[ratio_tpr_fpr==np.inf]=0
+        diff_tpr_fpr=tpr_test-fpr_test
+        #thresh_index = np.where(ratio_tpr_fpr==np.max(ratio_tpr_fpr))
+        thresh_index2 = np.where(diff_tpr_fpr==np.max(diff_tpr_fpr))
+        print "Threshold index found ", thresh_index2
+        for ind in thresh_index2:
+            print "TMVA Threshold", thresh_test[ind]*2-1
+        #thresh_test[thresh_index]*2-1
+        np.max(tpr_test-fpr_test)
+        plt.plot(thresh*2-1, tpr, 'r--', label='training true positive')
+        plt.plot(thresh*2-1, fpr, 'b--', label='training false positive')
+        plt.plot(thresh_test*2-1, tpr_test, 'r-', label='test true positive')
+        plt.plot(thresh_test*2-1, fpr_test, 'b-', label='test false positive')
+        #plt.axvline(thresh_test[thresh_index]*2-1,color='g', label='thresh ratio_tpr_fpr')
+        plt.axvline(thresh_test[thresh_index2[0]]*2-1,color='orange', label='thresh diff_tpr_fpr_test '+str(thresh_test[thresh_index2[0]]*2-1))
+        print str(model_file)+' has a thresh diff_tpr_fpr_test '+str(thresh_test[thresh_index2[0]]*2-1)
+        plt.xlim([-1.0, 1.0])
+        plt.ylim([0.0, 1.05])
+        plt.xlabel('Threshold')
+        plt.ylabel('True/False Positive Rate')
+        plt.title('ROC curve in the TMVA way')
+        plt.legend(loc="best")
+        plt.savefig(outfile+'_efficiency.png', format='png', dpi=500)
+
+def plot_all_xgb_models():
+    for i in range(4):
+        for j in range(4):
+            print "Working on BDT"+str(i)+str(j)+".model"
+            plot_pseudo_TMVA(model_file="BDT"+str(i)+str(j)+".model", train_file="V6/BDT_"+str(i)+'_'+str(j)+"_V6.txt",
+                             test_file="V6/BDT_"+str(i)+'_'+str(j)+"_Test_V6.txt", ifKDE=False,
+                             outfile="BDT_"+str(i)+'_'+str(j)+"_xgb", nbins=40, plot_roc=True,
+                             plot_tmva_roc=True, norm_hist=True)
 
 def roc_func(weights, predictions, test_y):
     ''' scipy minimize will pass the weights as a numpy array '''
