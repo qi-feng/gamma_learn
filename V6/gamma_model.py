@@ -328,6 +328,13 @@ class PyVMSCWData:
         self.BDT_Elevation = self.EventsDF.Elevation
         self.E_bins=np.digitize(self.BDT_ErecS, self.E_grid)-1
         self.Z_bins=np.digitize((90.-self.BDT_Elevation), self.Zen_grid)-1
+
+    def read_cuts(self, cutsfile):
+        self.cutsfile=cutsfile
+        self.cuts=np.array([[0.01841879,0.05553091,0.02724016,-0.35556817],
+                            [-0.04491699,0.69762886,0.0508287,0.28274822],
+                            [0.20882559,-0.42245674,0.35600829,-0.28852916],
+                            [-0.29889989,-0.36590242,-0.26210219,-0.30039829]])
     def predict_BDT(self, modelpath='.', modelbase='BDT', modelext='.model', scaler=None,fit_transform='linear'):
         if not hasattr(self, 'EventsDF'):
             print "No data frame for on events found, running self.get_data() now!"
@@ -359,7 +366,8 @@ class PyVMSCWData:
                 predict_y = clf.predict(xgb.DMatrix(predict_x))
                 self.EventsDF.MVA.values[np.where((self.E_bins==E) & (self.Z_bins==Z))] = predict_y
                 # !!! fill the gamma/hadron flag, use a simple 0.5 for now !!!
-                self.EventsDF.IsGamma.values[np.where((self.E_bins==E) & (self.Z_bins==Z))] = (predict_y>0.5).astype(np.float)
+                self.EventsDF.IsGamma.values[np.where((self.E_bins==E) & (self.Z_bins==Z))] = (predict_y>self.cuts[E][Z]).astype(np.float)
+
     def write_RFtree(self, runNum=None):
         if runNum==None:
             runNum=self.filename.split('/')[-1].split('.')[0]
@@ -838,11 +846,11 @@ def plot_pseudo_TMVA(model_file="BDT11.model", train_file="V6/BDT_1_1_V6.txt", t
         plt.savefig(outfile+'_efficiency.png', format='png', dpi=500)
 
 def plot_all_xgb_models():
-    for i in range(4):
+    for i in [1,2,3]:
         for j in range(4):
             print "Working on BDT"+str(i)+str(j)+".model"
-            plot_pseudo_TMVA(model_file="BDT"+str(i)+str(j)+".model", train_file="V6/BDT_"+str(i)+'_'+str(j)+"_V6.txt",
-                             test_file="V6/BDT_"+str(i)+'_'+str(j)+"_Test_V6.txt", ifKDE=False,
+            plot_pseudo_TMVA(model_file="BDT"+str(i)+str(j)+".model", train_file="./BDT_"+str(i)+'_'+str(j)+"_V6.txt",
+                             test_file="./BDT_"+str(i)+'_'+str(j)+"_Test_V6.txt", ifKDE=False,
                              outfile="BDT_"+str(i)+'_'+str(j)+"_xgb", nbins=40, plot_roc=True,
                              plot_tmva_roc=True, norm_hist=True)
 
