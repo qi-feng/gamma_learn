@@ -254,6 +254,22 @@ class PyVMSCWData:
     def __init__(self, filename="64080.mscw.root"):
         self.E_grid=np.array([0.08, 0.32, 0.5, 1.0, 50.0])
         self.Zen_grid=np.array([0.0, 25.0, 32.5, 42.5, 75.])
+        # cuts based on diff between tpr and fpr
+        #self.cuts=np.array([[0.01841879,0.05553091,0.02724016,-0.35556817],
+        #                    [-0.04491699,0.69762886,0.0508287,0.28274822],
+        #                    [0.20882559,-0.42245674,0.35600829,-0.28852916],
+        #                    [-0.29889989,-0.36590242,-0.26210219,-0.30039829]])
+        # cuts based on tpr > 0.9: 0.371932, ...
+        self.cuts=np.array([[0.371932, 0.368527, 0.399416, 0.167345],
+                            [0.248172, 0.664681, 0.407418, 0.478632], 
+                            [0.296128, 0.143885, 0.433343, 0.246594],
+                            [0.181648, 0.196016, 0.205474, 0.18396]])
+        # cuts based on fpr < 0.1:0.996557,...        
+        #self.cuts=np.array([[0.996557, 0.998946,0.998486, 0.995672],
+        #                    [0.994882, 0.997933, 0.998845, 0.99978],
+        #                    [0.995213, 0.982867, 0.997667, 0.999071],
+        #                    [0.99286, 0.988672, 0.99222, 0.997739]])
+
         if filename:
             self.filename = filename
             self.readEDfile(filename)
@@ -823,8 +839,11 @@ def plot_pseudo_TMVA(model_file="BDT11.model", train_file="V6/BDT_1_1_V6.txt", t
         #ratio_tpr_fpr=np.array(tpr_test/fpr_test)
         #ratio_tpr_fpr[ratio_tpr_fpr==np.inf]=0
         diff_tpr_fpr=tpr_test-fpr_test
-        #thresh_index = np.where(ratio_tpr_fpr==np.max(ratio_tpr_fpr))
+        thresh_index_fpr = np.argmin(tpr_test<=(1-thresh_IsGamma))
+        thresh_index_tpr = np.argmax(tpr_test>=thresh_IsGamma)
         thresh_index2 = np.where(diff_tpr_fpr==np.max(diff_tpr_fpr))
+        print "Threshold tpr>=thresh_IsGamma is "+str(thresh_test[thresh_index_tpr])
+        print "Threshold fpr<=(1-thresh_IsGamma) is "+str(thresh_test[thresh_index_fpr])
         print "Threshold index found ", thresh_index2
         for ind in thresh_index2:
             print "TMVA Threshold", thresh_test[ind]*2-1
@@ -836,6 +855,8 @@ def plot_pseudo_TMVA(model_file="BDT11.model", train_file="V6/BDT_1_1_V6.txt", t
         plt.plot(thresh_test*2-1, fpr_test, 'b-', label='test false positive')
         #plt.axvline(thresh_test[thresh_index]*2-1,color='g', label='thresh ratio_tpr_fpr')
         plt.axvline(thresh_test[thresh_index2[0]]*2-1,color='orange', label='thresh diff_tpr_fpr_test '+str(thresh_test[thresh_index2[0]]*2-1))
+        plt.axvline(thresh_test[thresh_index_tpr]*2-1,color='green', label='thresh tpr_test '+str(thresh_test[thresh_index_tpr]*2-1))
+        plt.axvline(thresh_test[thresh_index_fpr]*2-1,color='magenta', label='thresh fpr_test '+str(thresh_test[thresh_index_fpr]*2-1))
         print str(model_file)+' has a thresh diff_tpr_fpr_test '+str(thresh_test[thresh_index2[0]]*2-1)
         plt.xlim([-1.0, 1.0])
         plt.ylim([0.0, 1.05])
