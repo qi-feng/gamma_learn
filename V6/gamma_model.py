@@ -462,6 +462,7 @@ class PyVBDTData:
         self.filename = filename
         try:
             self.Rfile = ROOT.TFile(filename, "read");
+            print "Read ROOT file "+filename
         except:
             print "Unable to open root file", filename
     def get_tree(self, test=False):
@@ -469,10 +470,10 @@ class PyVBDTData:
             self.readBDTfile(self.filename)
         if test:
             data = self.Rfile.Get('TestTree');
-            print("Getting TestTree from file %s ..." % filename)
+            print("Getting TestTree from file %s ..." % self.filename)
         else:
             data = self.Rfile.Get('TrainTree');
-            print("Getting TrainTree from file %s ..." % filename)
+            print("Getting TrainTree from file %s ..." % self.filename)
         columns=['classID','className','MSCW','MSCL','log10_EChi2S_','EmissionHeight',
                   'log10_EmissionHeightChi2_','log10_SizeSecondMax_','sqrt_Xcore_T_Xcore_P_Ycore_T_Ycore_',
                   'NImages','Xoff','Yoff','ErecS','weight','BDT_0']
