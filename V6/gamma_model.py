@@ -578,7 +578,6 @@ class PyVBDTData:
                 out_df=pd.concat([pd.DataFrame(self.info.keys()), pd.DataFrame(self.score)], axis=1)
                 out_df.columns=['max_depth', 'eta', 'gamma', 'subsample', 'colsample_bytree', 'best_iteration', 'best_score']
                 out_df.to_csv(logfile, index=False)
-
         param = {'max_depth':max_depth, 'eta':eta,'eval_metric':'auc', 'silent':1, 'objective':'binary:logistic', 'gamma':gamma, 'subsample':subsample, 'colsample_bytree':colsample_bytree}
         if early_stop>0:
             clf_xgb = xgb.train(param, dtrain, num_round, watchlist, early_stopping_rounds=early_stop)
@@ -591,6 +590,13 @@ class PyVBDTData:
             preds = bst.predict(dtest)
         self.param=param
         self.clf_xgb=clf_xgb
+    def dump_model(self, outfile, dump_raw=False):
+        if not hasattr(self, 'clf_xgb'):
+            print("No model has been trained yet. Run self.do_xgb() first!")
+        else:
+            self.clf_xgb.save_model(outfile)
+            if dump_raw:
+                self.clf_xgb.dump_model(outfile+'dump.raw.txt')
 
 def read_data(filename='BDT_1_1.txt', predict=False, scaler=None, fit_transform='linear'):
     if predict==True:
