@@ -260,15 +260,35 @@ class PyVMSCWData:
         #                    [0.20882559,-0.42245674,0.35600829,-0.28852916],
         #                    [-0.29889989,-0.36590242,-0.26210219,-0.30039829]])
         # cuts based on tpr > 0.9: 0.371932, ...
-        self.cuts=np.array([[0.371932, 0.368527, 0.399416, 0.167345],
-                            [0.248172, 0.664681, 0.407418, 0.478632], 
-                            [0.296128, 0.143885, 0.433343, 0.246594],
-                            [0.181648, 0.196016, 0.205474, 0.18396]])
-        # cuts based on fpr < 0.1:0.996557,...        
-        #self.cuts=np.array([[0.996557, 0.998946,0.998486, 0.995672],
-        #                    [0.994882, 0.997933, 0.998845, 0.99978],
-        #                    [0.995213, 0.982867, 0.997667, 0.999071],
-        #                    [0.99286, 0.988672, 0.99222, 0.997739]])
+        #self.cuts=np.array([[0.371932, 0.368527, 0.399416, 0.167345],
+        #                    [0.248172, 0.664681, 0.407418, 0.478632], 
+        #                    [0.296128, 0.143885, 0.433343, 0.246594],
+        #                    [0.181648, 0.196016, 0.205474, 0.18396]])
+        # cuts based on fpr < 0.05: 0.743973,...        
+        #self.cuts=np.array([[0.743973, 0.762595, 0.716348, 0.598079],
+        #                    [0.669947, 0.942136, 0.677616, 0.997168],
+        #                    [0.785051, 0.529877, 0.841851, 0.627616],
+        #                    [0.523119, 0.510707, 0.603432, 0.509341]])
+        # cuts based on tpr > 0.95: , ...
+        #self.cuts=np.array([[0.186732, 0.183898, 0.194447, 0.0811499],
+        #                    [0.140657, 0.345577, 0.176298, 0.245122],
+        #                    [0.166601, 0.0739614, 0.190948, 0.0990855],
+        #                    [0.103235, 0.0879398, 0.092102, 0.0878038]])
+        # cuts based on tpr > 0.99: , ...
+        #self.cuts=np.array([[],
+        #                    [],
+        #                    [],
+        #                    []])
+        # cuts based on fpr < 0.01: 0.932055,...        
+        #self.cuts=np.array([[0.932055, 0.942873, 0.923558, 0.845185],
+        #                    [0.921017, 0.985742, 0.936361, 0.999639],
+        #                    [0.957725, 0.868326, 0.967239, 0.930004],
+        #                    [0.899173, 0.887127, 0.906322, 0.87103]])
+        # cuts based on fpr < 0.005: 0.959079,...        
+        self.cuts=np.array([[0.959079, 0.967442, 0.954211, 0.894039],
+                            [0.955311, 0.991051, 0.966303, 0.999719],
+                            [0.974992, 0.9178,   0.980435, 0.966418],
+                            [0.942434, 0.930608, 0.946548, 0.929107]])
 
         if filename:
             self.filename = filename
@@ -347,10 +367,10 @@ class PyVMSCWData:
 
     def read_cuts(self, cutsfile):
         self.cutsfile=cutsfile
-        self.cuts=np.array([[0.01841879,0.05553091,0.02724016,-0.35556817],
-                            [-0.04491699,0.69762886,0.0508287,0.28274822],
-                            [0.20882559,-0.42245674,0.35600829,-0.28852916],
-                            [-0.29889989,-0.36590242,-0.26210219,-0.30039829]])
+        #self.cuts=np.array([[0.01841879,0.05553091,0.02724016,-0.35556817],
+        #                    [-0.04491699,0.69762886,0.0508287,0.28274822],
+        #                    [0.20882559,-0.42245674,0.35600829,-0.28852916],
+        #                    [-0.29889989,-0.36590242,-0.26210219,-0.30039829]])
     def predict_BDT(self, modelpath='.', modelbase='BDT', modelext='.model', scaler=None,fit_transform='linear'):
         if not hasattr(self, 'EventsDF'):
             print "No data frame for on events found, running self.get_data() now!"
@@ -770,13 +790,16 @@ def do_xgb(filename='BDT_1_1_V6.txt',search=False, logfile=None, max_depth=15, e
         preds = bst.predict(dtest)
     return clf_xgb
 
+def calcLiMa(non, noff, alpha):
+    return np.sqrt(2*(non*np.log((1.+alpha)/alpha*(non/(non+noff)))+noff*np.log((1.+alpha)*(noff/(non+noff)))))
+
 def print_best_xgb(lfile, num=8):
     df_ = pd.read_csv(lfile)
     pd.set_option('display.width', 1000)
     print df_.sort(columns='best_score', ascending=False).head(num)
 
 def plot_pseudo_TMVA(model_file="BDT11.model", train_file="V6/BDT_1_1_V6.txt", test_file="V6/BDT_1_1_Test_V6.txt",
-                     ifKDE=False, outfile='BDT_1_1_xgb', nbins=40, plot_roc=True, plot_tmva_roc=True, norm_hist=True):
+                     ifKDE=False, outfile='BDT_1_1_xgb', nbins=40, plot_roc=True, plot_tmva_roc=True, norm_hist=True, thresh_IsGamma=0.95):
     clf = xgb.Booster() #init model
     clf.load_model(model_file) # load data
     train_x, train_y =read_data_xgb(train_file, predict=True)
@@ -834,19 +857,21 @@ def plot_pseudo_TMVA(model_file="BDT11.model", train_file="V6/BDT_1_1_V6.txt", t
     if(plot_tmva_roc==True):
         # Plot TMVA ROC curve
         plt.figure(figsize=(6, 6))
-        thresh_IsGamma=0.9
+        #thresh_IsGamma=0.95
         #thresh_index=np.argmax(tpr_test>=thresh_IsGamma)
         #ratio_tpr_fpr=np.array(tpr_test/fpr_test)
         #ratio_tpr_fpr[ratio_tpr_fpr==np.inf]=0
         diff_tpr_fpr=tpr_test-fpr_test
-        thresh_index_fpr = np.argmin(tpr_test<=(1-thresh_IsGamma))
+        thresh_index_fpr = np.argmin(fpr_test<=(1-thresh_IsGamma))
         thresh_index_tpr = np.argmax(tpr_test>=thresh_IsGamma)
         thresh_index2 = np.where(diff_tpr_fpr==np.max(diff_tpr_fpr))
-        print "Threshold tpr>=thresh_IsGamma is "+str(thresh_test[thresh_index_tpr])
-        print "Threshold fpr<=(1-thresh_IsGamma) is "+str(thresh_test[thresh_index_fpr])
+        print "Threshold tpr>="+str(thresh_IsGamma)+" is "+str(thresh_test[thresh_index_tpr])
+        print "Threshold fpr<="+str(1-thresh_IsGamma)+" is "+str(thresh_test[thresh_index_fpr])
         print "Threshold index found ", thresh_index2
-        for ind in thresh_index2:
-            print "TMVA Threshold", thresh_test[ind]*2-1
+        for ind_ in thresh_index2:
+            for ind in ind_:
+                print "TMVA Threshold", thresh_test[ind]*2-1
+                plt.axvline(thresh_test[ind]*2-1,color='orange', label='thresh diff_tpr_fpr_test '+str(thresh_test[ind]*2-1))
         #thresh_test[thresh_index]*2-1
         np.max(tpr_test-fpr_test)
         plt.plot(thresh*2-1, tpr, 'r--', label='training true positive')
@@ -854,7 +879,7 @@ def plot_pseudo_TMVA(model_file="BDT11.model", train_file="V6/BDT_1_1_V6.txt", t
         plt.plot(thresh_test*2-1, tpr_test, 'r-', label='test true positive')
         plt.plot(thresh_test*2-1, fpr_test, 'b-', label='test false positive')
         #plt.axvline(thresh_test[thresh_index]*2-1,color='g', label='thresh ratio_tpr_fpr')
-        plt.axvline(thresh_test[thresh_index2[0]]*2-1,color='orange', label='thresh diff_tpr_fpr_test '+str(thresh_test[thresh_index2[0]]*2-1))
+        #plt.axvline(thresh_test[thresh_index2]*2-1,color='orange', label='thresh diff_tpr_fpr_test '+str(thresh_test[thresh_index2]*2-1))
         plt.axvline(thresh_test[thresh_index_tpr]*2-1,color='green', label='thresh tpr_test '+str(thresh_test[thresh_index_tpr]*2-1))
         plt.axvline(thresh_test[thresh_index_fpr]*2-1,color='magenta', label='thresh fpr_test '+str(thresh_test[thresh_index_fpr]*2-1))
         print str(model_file)+' has a thresh diff_tpr_fpr_test '+str(thresh_test[thresh_index2[0]]*2-1)
@@ -866,14 +891,14 @@ def plot_pseudo_TMVA(model_file="BDT11.model", train_file="V6/BDT_1_1_V6.txt", t
         plt.legend(loc="best")
         plt.savefig(outfile+'_efficiency.png', format='png', dpi=500)
 
-def plot_all_xgb_models():
-    for i in [1,2,3]:
+def plot_all_xgb_models(thresh_IsGamma=0.99):
+    for i in [0,1,2,3]:
         for j in range(4):
             print "Working on BDT"+str(i)+str(j)+".model"
             plot_pseudo_TMVA(model_file="BDT"+str(i)+str(j)+".model", train_file="./BDT_"+str(i)+'_'+str(j)+"_V6.txt",
                              test_file="./BDT_"+str(i)+'_'+str(j)+"_Test_V6.txt", ifKDE=False,
-                             outfile="BDT_"+str(i)+'_'+str(j)+"_xgb", nbins=40, plot_roc=True,
-                             plot_tmva_roc=True, norm_hist=True)
+                             outfile="BDT_"+str(i)+'_'+str(j)+"_xgb_thresh"+str(thresh_IsGamma), nbins=40, plot_roc=True,
+                             plot_tmva_roc=True, norm_hist=True, thresh_IsGamma=thresh_IsGamma)
 
 def roc_func(weights, predictions, test_y):
     ''' scipy minimize will pass the weights as a numpy array '''
