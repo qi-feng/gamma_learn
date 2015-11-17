@@ -446,6 +446,151 @@ class PyVMSCWData:
         self.xgbfile.Write()
         self.xgbfile.Close()
 
+class PyVBDTData:
+    ############################################################################
+    #                       Initialization of the object.                      #
+    ############################################################################
+    def __init__(self, filename=None):
+        self.E_grid=np.array([0.08, 0.32, 0.5, 1.0, 50.0])
+        self.Zen_grid=np.array([0.0, 25.0, 32.5, 42.5, 75.])
+        self.filename = filename
+        if filename:
+            self.readBDTfile(filename)
+        else:
+            print("No BDT root files provided, need to run self.readBDTfile(\"filename.root\").")
+    def readBDTfile(self, filename):
+        self.filename = filename
+        try:
+            self.Rfile = ROOT.TFile(filename, "read");
+        except:
+            print "Unable to open root file", filename
+    def get_tree(self, test=False):
+        if not hasattr(self, 'Rfile'):
+            self.readBDTfile(self.filename)
+        if test:
+            data = self.Rfile.Get('TestTree');
+            print("Getting TestTree from file %s ..." % filename)
+        else:
+            data = self.Rfile.Get('TrainTree');
+            print("Getting TrainTree from file %s ..." % filename)
+        columns=['classID','className','MSCW','MSCL','log10_EChi2S_','EmissionHeight',
+                  'log10_EmissionHeightChi2_','log10_SizeSecondMax_','sqrt_Xcore_T_Xcore_P_Ycore_T_Ycore_',
+                  'NImages','Xoff','Yoff','ErecS','weight','BDT_0']
+        df_ = pd.DataFrame(np.array([np.zeros(data.GetEntries())]*len(columns)).T,
+                           columns=columns)
+        for i, event in enumerate(data):
+            Nlog=10000
+            if (i % Nlog) == 0:
+                print str(i)+" events read..."
+            # fill the pandas dataframe from input tree
+            df_.classID[i] = event.classID
+            df_.className[i] = event.className
+            df_.MSCW[i] = event.MSCW
+            df_.MSCL[i] = event.MSCL
+            df_.log10_EChi2S_[i] = event.log10_EChi2S_
+            df_.log10_EmissionHeightChi2_[i] = event.log10_EmissionHeightChi2_
+            df_.log10_SizeSecondMax_[i] = event.log10_SizeSecondMax_
+            df_.sqrt_Xcore_T_Xcore_P_Ycore_T_Ycore_[i] = event.sqrt_Xcore_T_Xcore_P_Ycore_T_Ycore_
+            # NImages, Xoff, Yoff not used:
+            df_.NImages[i] = 0.0
+            df_.Xoff[i] = 0.0
+            df_.Yoff[i] = 0.0
+            df_.ErecS[i] = event.ErecS
+            df_.weight[i] = event.weight
+            df_.BDT_0[i] = event.BDT_0
+        if test:
+            if not hasattr(self, 'TestTree'):
+                self.TestTree=df_
+        else:
+            if not hasattr(self, 'TrainTree'):
+                self.TrainTree=df_
+    def make_features(self, test=False, fit_transform=None, scaler=None):
+        if test:
+            if not hasattr(self, 'TestTree'):
+                print "No TestTree found, running self.get_tree() now!"
+                self.get_tree(test=test)
+            x = np.array(self.TestTree.drop(['classID','className','weight','BDT_0'],axis=1).values)
+            y = data['classID']
+            self.test_y = y.values.astype(np.int32)
+        else:
+            if not hasattr(self, 'TrainTree'):
+                print "No TrainTree found, running self.get_tree() now!"
+                self.get_tree(test=test)
+            x = np.array(self.TrainTree.drop(['classID','className','weight','BDT_0'],axis=1).values)
+            y = data['classID']
+            self.train_y = y.values.astype(np.int32)
+        if scaler==None:
+            scaler = StandardScaler()
+        if fit_transform=='log':
+            print "log transform the input features"
+            x = scaler.fit_transform(np.log(x + 1.)).astype(np.float32)
+        elif fit_transform=='linear':
+            print "linear transform the input features"
+            x = scaler.fit_transform(x).astype(np.float32)
+        else:
+            print "no transforms on the input features"
+            x = x.astype(np.float32)
+        if test:
+            self.test_x = x
+        else:
+            self.train_x = x
+            self.scaler = scaler
+
+    def do_xgb(self, search=False, logfile=None,
+               max_depth=15, eta=0.04, gamma=5, subsample=0.6,colsample_bytree=0.7,
+               num_round=500, predict_file=None, early_stop=50, test_ratio=0.2):
+        if not hasattr(self, 'train_x'):
+            self.make_features(test=False, fit_transform=None, scaler=None)
+        sss = StratifiedShuffleSplit(self.train_y, test_size=test_ratio, random_state=1234)
+        for train_index, test_index in sss:
+            break
+        self.train_index = train_index
+        self.test_index = test_index
+        train_x, train_y = self.train_x[train_index], self.train_y[train_index]
+        test_x, test_y = self.train_x[test_index], self.train_y[test_index]
+        dtrain = xgb.DMatrix(train_x, label=train_y)
+        deval  = xgb.DMatrix(test_x, label=test_y)
+        watchlist  = [(dtrain,'train'),(deval,'eval')]
+        if search==True:
+            #num_round = 200
+            self.info = {}
+            for md in max_depth:
+                for eta_ in eta:
+                    for gamma_ in gamma:
+                        for sam in subsample:
+                            for col in colsample_bytree:
+                                param = {'max_depth':md, 'eta':eta_,'eval_metric':'auc',
+                                         'silent':1, 'objective':'binary:logistic', 'gamma':gamma_,
+                                         'subsample':sam, 'colsample_bytree':col }
+                                if early_stop>0:
+                                    clf_xgb = xgb.train(param, dtrain, num_round, watchlist, early_stopping_rounds=early_stop)
+                                    self.info[md,eta_,gamma_,sam,col,clf_xgb.best_iteration] = clf_xgb.best_score
+                                else:
+                                    clf_xgb = xgb.train(param, dtrain, num_round, watchlist)
+                                    self.info[md,eta_,gamma_,sam,col] = clf_xgb.eval(deval)
+            if early_stop>0:
+                self.score = np.array(self.info.values())
+            else:
+                self.score = [float(self.info.values()[i][13:]) for i in range(len(self.info))]
+                self.score = np.array(self.score)
+            print self.info, self.score
+            if logfile!=None:
+                out_df=pd.concat([pd.DataFrame(self.info.keys()), pd.DataFrame(self.score)], axis=1)
+                out_df.columns=['max_depth', 'eta', 'gamma', 'subsample', 'colsample_bytree', 'best_iteration', 'best_score']
+                out_df.to_csv(logfile, index=False)
+
+        param = {'max_depth':max_depth, 'eta':eta,'eval_metric':'auc', 'silent':1, 'objective':'binary:logistic', 'gamma':gamma, 'subsample':subsample, 'colsample_bytree':colsample_bytree}
+        if early_stop>0:
+            clf_xgb = xgb.train(param, dtrain, num_round, watchlist, early_stopping_rounds=early_stop)
+        else:
+            clf_xgb = xgb.train(param, dtrain, num_round, watchlist)
+        if predict_file != None:
+            #Not ready yet
+            _x,_y,_ = read_data(filename=filename)
+            dtest = xgb.DMatrix(_x)
+            preds = bst.predict(dtest)
+        self.param=param
+        self.clf_xgb=clf_xgb
 
 def read_data(filename='BDT_1_1.txt', predict=False, scaler=None, fit_transform='linear'):
     if predict==True:
@@ -484,6 +629,40 @@ def read_data(filename='BDT_1_1.txt', predict=False, scaler=None, fit_transform=
     y = data['classID']
     y = y.values.astype(np.int32)
     return x, y, scaler
+
+def compare_two_anasum_on_off(file1, file2, label1=None, label2=None, mode='Off'):
+    data_ED = PyVAnaSumData(filename=file1)
+    data_xgb = PyVAnaSumData(filename=file2)
+    data_ED.get_data_on()
+    data_ED.get_data_off()
+    data_xgb.get_data_on()
+    data_xgb.get_data_off()
+    data_ED.make_BDT_on()
+    data_ED.make_BDT_off()
+    data_xgb.make_BDT_on()
+    data_xgb.make_BDT_off()
+    fig, ax = plt.subplots(4, 4, figsize=(20, 20))
+    fig.subplots_adjust(left=0.15, right=0.95, bottom=0.18, top=0.92)
+    colors = ['red', 'blue']
+    labels = [label1+'_'+mode, label2+'_'+mode]
+    common_params = dict(bins=4, range=(-1, 2), normed=False, color=colors, label=labels)
+    sns.set(style="darkgrid", palette="Set2")
+    for i in range(4):
+        for j in range(4):
+            ED_slice = data_ED.OnEvts.IsGamma.values[np.where((data_ED.E_bins==i) & (data_ED.Z_bins==j))]
+            xgb_slice = data_xgb.OnEvts.IsGamma.values[np.where((data_xgb.E_bins==i) & (data_xgb.Z_bins==j))]
+            if mode=='On':
+                ax[i][j].hist((ED_slice, xgb_slice), **common_params)
+            if mode=='Off':
+                ax[i][j].hist((ED_slice, xgb_slice), **common_params)
+            ax[i][j].set_xlabel(r'IsGamma',fontsize=10)
+            ax[i][j].set_ylabel(r'Counts',fontsize=10)
+            ax[i][j].set_xlim(-0.5,1.5)
+            ax[i][j].legend(loc='best')
+            ax[i][j].set_title('Bin_'+str(i)+str(j))
+            #ax[i][j].set_ylim(-1.2,1.2)
+    plt.tight_layout()
+    return plt
 
 def read_ED_anasum_data(filename='test_Crab_V6_ED_RE.txt', scaler=None, fit_transform='linear'):
     print "Reading EventDisplay anasum data..."
