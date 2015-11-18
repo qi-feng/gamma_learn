@@ -958,8 +958,10 @@ def do_nn(xTrain, yTrain, test_x=None, test_y=None, dropout_in=0.2, dense0_num=8
             print('NN dropout_in = %.5f, dense0_num = %d, dropout_p = %.5f, dense1_num = %d, ROC score = %.5f(%.5f)' % \
                   (md[0], md[1], md[2], md[3], scores.mean(), scores.std()))
 
-def do_xgb(filename='BDT_1_1_V6.txt',search=False, logfile=None, max_depth=15, eta=0.04, gamma=5, subsample=0.6,colsample_bytree=0.7, num_round=200, predict_file=None, early_stop=0, test_ratio=0.1):
-    x,y,_ = read_data(filename=filename)
+def do_xgb(filename='BDT_1_1_V6.txt',search=False, logfile=None, max_depth=15, eta=0.04, gamma=5,
+           subsample=0.6, colsample_bytree=0.7, num_round=200, predict_file=None,
+           early_stop=0, test_ratio=0.1, fit_transform=None):
+    x,y,_ = read_data(filename=filename, fit_transform=fit_transform)
     sss = StratifiedShuffleSplit(y, test_size=test_ratio, random_state=1234)
     for train_index, test_index in sss:
         break
