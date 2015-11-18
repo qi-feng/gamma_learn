@@ -119,7 +119,7 @@ class PyVAnaSumData:
         self.BDT_Elevation = self.OnEvts.Elevation
         self.E_bins=np.digitize(self.BDT_ErecS, self.E_grid)-1
         self.Z_bins=np.digitize((90.-self.BDT_Elevation), self.Zen_grid)-1
-    def predict_BDT_on(self, modelpath='.', modelbase='BDT', modelext='.model', scaler=None,fit_transform='linear'):
+    def predict_BDT_on(self, modelpath='.', modelbase='BDT', modelext='.model', scaler=None,fit_transform=None):
         if not hasattr(self, 'OnEvts'):
             print "No data frame for on events found, running self.get_data_on() now!"
             self.get_data_on()
@@ -132,7 +132,7 @@ class PyVAnaSumData:
         elif fit_transform=='linear':
             self.BDTon = scaler.fit_transform(self.BDTon).astype(np.float32)
         else:
-            self.BDTon = self.BDTon.astype(np.float32)
+            self.BDTon = self.BDTon.values.astype(np.float32)
         # Now divide into bins in ErecS and Zen
         # Note that if ErecS>50TeV or Zen>75, put them in the highest bin (bias! but rare)
         #for E in np.unique(self.E_bins):
@@ -220,7 +220,7 @@ class PyVAnaSumData:
         self.BDT_Elevation_off = self.OffEvts.Elevation
         self.E_bins_off=np.digitize(self.BDT_ErecS_off, self.E_grid)-1
         self.Z_bins_off=np.digitize((90.-self.BDT_Elevation_off), self.Zen_grid)-1
-    def predict_BDT_off(self, modelpath='.', modelbase='BDT', modelext='.model', scaler=None,fit_transform='linear'):
+    def predict_BDT_off(self, modelpath='.', modelbase='BDT', modelext='.model', scaler=None,fit_transform=None):
         if not hasattr(self, 'OffEvts'):
             print "No data frame for off events found, running self.get_data_off() now!"
             self.get_data_off()
@@ -233,7 +233,7 @@ class PyVAnaSumData:
         elif fit_transform=='linear':
             self.BDToff = scaler.fit_transform(self.BDToff).astype(np.float32)
         else:
-            self.BDToff = self.BDToff.astype(np.float32)
+            self.BDToff = self.BDToff.values.astype(np.float32)
         # Now divide into bins in ErecS and Zen
         # Note that if ErecS>50TeV or Zen>75, ignore them (rare)
         #for E in np.unique(self.E_bins_off):
@@ -270,10 +270,10 @@ class PyVMSCWData:
         #                    [0.785051, 0.529877, 0.841851, 0.627616],
         #                    [0.523119, 0.510707, 0.603432, 0.509341]])
         # cuts based on tpr > 0.95: , ...
-        #self.cuts=np.array([[0.186732, 0.183898, 0.194447, 0.0811499],
-        #                    [0.140657, 0.345577, 0.176298, 0.245122],
-        #                    [0.166601, 0.0739614, 0.190948, 0.0990855],
-        #                    [0.103235, 0.0879398, 0.092102, 0.0878038]])
+        self.cuts=np.array([[0.186732, 0.183898, 0.194447, 0.0811499],
+                            [0.140657, 0.345577, 0.176298, 0.245122],
+                            [0.166601, 0.0739614, 0.190948, 0.0990855],
+                            [0.103235, 0.0879398, 0.092102, 0.0878038]])
         # cuts based on tpr > 0.99: , ...
         #self.cuts=np.array([[],
         #                    [],
@@ -285,10 +285,10 @@ class PyVMSCWData:
         #                    [0.957725, 0.868326, 0.967239, 0.930004],
         #                    [0.899173, 0.887127, 0.906322, 0.87103]])
         # cuts based on fpr < 0.005: 0.959079,...        
-        self.cuts=np.array([[0.959079, 0.967442, 0.954211, 0.894039],
-                            [0.955311, 0.991051, 0.966303, 0.999719],
-                            [0.974992, 0.9178,   0.980435, 0.966418],
-                            [0.942434, 0.930608, 0.946548, 0.929107]])
+        #self.cuts=np.array([[0.959079, 0.967442, 0.954211, 0.894039],
+        #                    [0.955311, 0.991051, 0.966303, 0.999719],
+        #                    [0.974992, 0.9178,   0.980435, 0.966418],
+        #                    [0.942434, 0.930608, 0.946548, 0.929107]])
 
         if filename:
             self.filename = filename
@@ -371,7 +371,7 @@ class PyVMSCWData:
         #                    [-0.04491699,0.69762886,0.0508287,0.28274822],
         #                    [0.20882559,-0.42245674,0.35600829,-0.28852916],
         #                    [-0.29889989,-0.36590242,-0.26210219,-0.30039829]])
-    def predict_BDT(self, modelpath='.', modelbase='BDT', modelext='.model', scaler=None,fit_transform='linear'):
+    def predict_BDT(self, modelpath='.', modelbase='BDT', modelext='.model', scaler=None,fit_transform=None):
         if not hasattr(self, 'EventsDF'):
             print "No data frame for on events found, running self.get_data() now!"
             self.get_data()
@@ -384,7 +384,7 @@ class PyVMSCWData:
         elif fit_transform=='linear':
             self.BDT = scaler.fit_transform(self.BDT).astype(np.float32)
         else:
-            self.BDT = self.BDT.astype(np.float32)
+            self.BDT = self.BDT.values.astype(np.float32)
         # Deal with NaN and Inf:
         #self.BDT = self.BDT.replace([np.inf, -np.inf], np.nan)
         #self.BDT = self.BDT.fillna(0)
@@ -402,7 +402,9 @@ class PyVMSCWData:
                 predict_y = clf.predict(xgb.DMatrix(predict_x))
                 self.EventsDF.MVA.values[np.where((self.E_bins==E) & (self.Z_bins==Z))] = predict_y
                 # !!! fill the gamma/hadron flag, use a simple 0.5 for now !!!
-                self.EventsDF.IsGamma.values[np.where((self.E_bins==E) & (self.Z_bins==Z))] = (predict_y>self.cuts[E][Z]).astype(np.float)
+                #self.EventsDF.IsGamma.values[np.where((self.E_bins==E) & (self.Z_bins==Z))] = (predict_y>self.cuts[E][Z]).astype(np.float)
+                # !!!! 0 is signal........
+                self.EventsDF.IsGamma.values[np.where((self.E_bins==E) & (self.Z_bins==Z))] = ((predict_y*2-1)<self.cuts[E][Z]).astype(np.float)
 
     def write_RFtree(self, runNum=None):
         if runNum==None:
@@ -480,7 +482,7 @@ class PyVBDTData:
         df_ = pd.DataFrame(np.array([np.zeros(data.GetEntries())]*len(columns)).T,
                            columns=columns)
         for i, event in enumerate(data):
-            Nlog=10000
+            Nlog=100
             if (i % Nlog) == 0:
                 print str(i)+" events read..."
             # fill the pandas dataframe from input tree
@@ -599,7 +601,7 @@ class PyVBDTData:
             if dump_raw:
                 self.clf_xgb.dump_model(outfile+'dump.raw.txt')
 
-def read_data(filename='BDT_1_1.txt', predict=False, scaler=None, fit_transform='linear'):
+def read_data(filename='BDT_1_1.txt', predict=False, scaler=None, fit_transform=None):
     if predict==True:
         print "Read data for prediction..."
         x = pd.read_csv(filename)
@@ -671,7 +673,36 @@ def compare_two_anasum_on_off(file1, file2, label1=None, label2=None, mode='Off'
     plt.tight_layout()
     return plt
 
-def read_ED_anasum_data(filename='test_Crab_V6_ED_RE.txt', scaler=None, fit_transform='linear'):
+def compare_sig_bkg(x, y, columns=None, save_eps=None):
+    if columns==None:
+        columns = ['MSCW','MSCL','log10_EChi2S_','EmissionHeight',
+                   'log10_EmissionHeightChi2_','log10_SizeSecondMax_','sqrt_Xcore_T_Xcore_P_Ycore_T_Ycore_',
+                   'NImages','Xoff','Yoff','ErecS']
+    #x_sig=x[np.where(y==0),:]
+    #x_bkg=x[np.where(y==1),:]
+    fig, ax = plt.subplots(2, 4, figsize=(20, 10))
+    fig.subplots_adjust(left=0.15, right=0.95, bottom=0.18, top=0.92)
+    colors = ['blue', 'red']
+    labels = ['signal', 'background']
+    #hatches = [None, '//']
+    sns.set(style="whitegrid", palette="Set2")
+    ranges=[(-2, 2), (-2, 5), (-6.5, 2), (0, 110), (-10, 4), (2, 5.5), (0, 1200)]
+    for col in range(7):
+        #common_params = dict(bins=20, range=ranges[col], histtype='step',
+        #                    normed=False, color=colors, label=labels, alpha=0.6)
+        common_params = dict(bins=40, histtype='step',
+                            normed=False, color=colors, label=labels, alpha=0.8, lw=2.)
+        ax[col/4,col%4].hist((x[np.where(y==0),col], x[np.where(y==1),col]), **common_params)
+        ax[col/4,col%4].set_xlabel(columns[col])
+        ax[col/4,col%4].set_ylabel(r'Density')
+        ax[col/4,col%4].legend(loc='best')
+        ax[col/4,col%4].set_title(columns[col])
+    plt.tight_layout()
+    if save_eps!=None:
+        plt.savefig(save_eps, format='eps', dpi=500)
+    return fig, plt
+
+def read_ED_anasum_data(filename='test_Crab_V6_ED_RE.txt', scaler=None, fit_transform=None):
     print "Reading EventDisplay anasum data..."
     data = pd.read_csv(filename, header=None, sep=r"\s+")
     data.columns=['runNum','evtNum','MSCW','MSCL','log10_EChi2S_','EmissionHeight',
@@ -692,7 +723,7 @@ def read_ED_anasum_data(filename='test_Crab_V6_ED_RE.txt', scaler=None, fit_tran
     y = y.values.astype(np.int32)
     return x, y, scaler
 
-def read_data_xgb(filename='BDT_1_1.txt', predict=False, cv_ratio=0.1, scaler=None, fit_transform='linear', random_state=1234): 
+def read_data_xgb(filename='BDT_1_1.txt', predict=False, cv_ratio=0.1, scaler=None, fit_transform=None, random_state=1234):
     if predict:
         x, y, _ = read_data(filename=filename, predict=False, scaler=scaler, fit_transform=fit_transform)
         dtestx = xgb.DMatrix(x)
@@ -1018,9 +1049,9 @@ def plot_pseudo_TMVA(model_file="BDT11.model", train_file="V6/BDT_1_1_V6.txt", t
         plt.savefig(outfile+'counts.png', format='png', dpi=500)
     # Compute ROC curve and ROC area
     # roc_auc = dict()
-    fpr, tpr, thresh = roc_curve(train_y,predict_train_y)
+    fpr, tpr, thresh = roc_curve(train_y,predict_train_y, pos_label=0)
     roc_auc = auc(fpr, tpr)
-    fpr_test, tpr_test, thresh_test = roc_curve(test_y,predict_test_y)
+    fpr_test, tpr_test, thresh_test = roc_curve(test_y,predict_test_y, pos_label=0)
     roc_auc_test = auc(fpr_test, tpr_test)
     print 'The training AUC score is {0}, and the test AUC score is: {1}'.format(
             roc_auc, roc_auc_test)
@@ -1051,8 +1082,10 @@ def plot_pseudo_TMVA(model_file="BDT11.model", train_file="V6/BDT_1_1_V6.txt", t
         thresh_index_fpr = np.argmin(fpr_test<=(1-thresh_IsGamma))
         thresh_index_tpr = np.argmax(tpr_test>=thresh_IsGamma)
         thresh_index2 = np.where(diff_tpr_fpr==np.max(diff_tpr_fpr))
-        print "Threshold tpr>="+str(thresh_IsGamma)+" is "+str(thresh_test[thresh_index_tpr])
-        print "Threshold fpr<="+str(1-thresh_IsGamma)+" is "+str(thresh_test[thresh_index_fpr])
+        print "Note that below TMVA threshold [-1, 1] is used instead of probability"
+        print "However, note that thresh_IsGamma should be given in probability"
+        print "Threshold tpr>="+str(thresh_IsGamma)+" is "+str(thresh_test[thresh_index_tpr]*2-1)
+        print "Threshold fpr<="+str(1-thresh_IsGamma)+" is "+str(thresh_test[thresh_index_fpr]*2-1)
         print "Threshold index found ", thresh_index2
         for ind_ in thresh_index2:
             for ind in ind_:
@@ -1093,35 +1126,6 @@ def roc_func(weights, predictions, test_y):
             final_prediction += weight*prediction
     return roc_auc_score(test_y, final_prediction)
 
-def make_predictions(clfs, predict_x, enrollment_id, test_x=None, test_y=None, outfile='test_sub.csv', weights=[]):
-    scores = []    
-    predictions = []
-    for clf in clfs:
-        _probas = clf.predict_proba(test_x)[:,1]
-        _score = roc_auc_score(test_y, _probas)
-        print("ROC score", _score)
-        predictions.append(_probas)
-        scores.append(_score)
-    starting_values = [0.5]*len(predictions)
-    cons = ({'type':'eq','fun':lambda w: 1-sum(w)})
-    #our weights are bound between 0 and 1    
-    bounds = [(0,1)]*len(predictions)
-    print len(predictions), len(test_y)
-    res = minimize(roc_func, starting_values, args= (predictions, test_y), method='SLSQP', bounds=bounds, constraints=cons)
-    predict_y=[]
-    for clf, wt in zip(clfs, res['x']):
-        pred_test_current_clf = pd.DataFrame((clf.predict_proba(predict_x))) * wt
-        if not predict_y:
-            predict_y = pred_test_current_clf
-        else:
-            predict_y = predict_y + pred_test_current_clf
-    sub = pd.concat([pd.DataFrame(enrollment_id), pd.DataFrame(predict_y)],axis=1)
-    sub.to_csv(outfile, index=False, header=False)
-
-def plotPseudoMvaValue(y):
-    sns.distplot(y*2.-1.)
-    return y*2.-1.
-
 def run(train_file='train_xy2.csv', test_file='test_features2.csv', outfile='test_sub2.csv'):
     train_ratio = 0.9
     test_ratio = 1 - train_ratio
@@ -1140,64 +1144,10 @@ def run(train_file='train_xy2.csv', test_file='test_features2.csv', outfile='tes
     clf_rf = do_RF3(train_x, train_y, test_x=test_x, test_y=test_y)
     clf_gbdt = do_gbdt3(train_x, train_y, test_x=test_x, test_y=test_y)
 
-    make_predictions([clf_rf, clf_gbdt,clf_nn], predict_x, enrollment_id, test_x=test_x, test_y=test_y,
-                     outfile=outfile)
-
-def tune3(train_x, train_y, test_x, test_y):
+def tune(train_x, train_y, test_x, test_y):
     do_nn(train_x, train_y, test_x=test_x, test_y=test_y, search=True)
     do_RF(train_x, train_y, test_x=test_x, test_y=test_y, search=True)
     do_gbdt(train_x, train_y, test_x=test_x, test_y=test_y, search=True)
-
-def rocFunc(weights, predictions, test_y):
-    ''' scipy minimize will pass the weights as a numpy array '''
-    final_prediction = 0
-    for weight, prediction in zip(weights, predictions):
-        final_prediction += weight*prediction
-    return -roc_auc_score(test_y, final_prediction)
-
-def makeSub(clfs, predict_x, enrollment_id, scaler, test_x, test_y, deval, dtest, outfile='test_sub.csv'):
-    scores = []
-    predictions = []
-
-    for ii, clf in enumerate(clfs):
-        if ii < 6:
-                #print ii, clf
-                #_probas = clf.predict(xgb.DMatrix(test_x))[:,1]
-                _probas = clf.predict(deval)
-        else:
-                #print ii, clf
-                _probas = clf.predict_proba(test_x)[:,1] #drop out prob
-        _score = roc_auc_score(test_y, _probas)
-        print("ROC score", _score)
-        predictions.append(_probas)
-        scores.append(_score)
-
-    starting_values = [1.0/len(predictions)]*len(predictions)
-
-    cons = ({'type':'eq','fun':lambda w: 1-sum(w)})
-    bounds = [(0.,1.)]*len(predictions)
-
-    res = minimize(rocFunc, starting_values, args= (predictions, test_y), method='SLSQP',
-            options={'disp': True, 'eps': 5e-2},
-            bounds=bounds, constraints=cons)
-    print res
-
-    print('Ensemble Score: {best_score}'.format(best_score=res['fun']))
-    print('Best Weights: {weights}'.format(weights=res['x']))
-
-
-    #predict_x, enrollment_id = loadData(test_file,test=True,scaler=scaler)
-    predict_y = 0
-    kk = 0
-    for clf, wt in zip(clfs, res['x']):
-        if kk < 6:
-            predict_y += clf.predict(dtest)
-        else:
-            predict_y += clf.predict_proba(predict_x)[:,1] * wt
-        kk += 1
-    sub = pd.concat([pd.DataFrame(enrollment_id), pd.DataFrame(predict_y)],axis=1)
-    sub.to_csv(outfile, index=False, header=False)
-
 
 
 if __name__ == '__main__':
@@ -1206,7 +1156,6 @@ if __name__ == '__main__':
     #tune(train_file='train_xy2.csv')
 
     #run(train_file='train_xy2.csv', test_file='test_features2.csv', outfile='test_sub2.csv')
-    import os
     for f in os.listdir("/project/veritas/qfeng/gamma_learn/V6"):
         if f.endswith(".txt"):
             print "working on file "+str(f)+"..."
