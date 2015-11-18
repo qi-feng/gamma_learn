@@ -484,21 +484,21 @@ class PyVBDTData:
             if (i % Nlog) == 0:
                 print str(i)+" events read..."
             # fill the pandas dataframe from input tree
-            df_.classID[i] = event.classID
-            df_.className[i] = event.className
-            df_.MSCW[i] = event.MSCW
-            df_.MSCL[i] = event.MSCL
-            df_.log10_EChi2S_[i] = event.log10_EChi2S_
-            df_.log10_EmissionHeightChi2_[i] = event.log10_EmissionHeightChi2_
-            df_.log10_SizeSecondMax_[i] = event.log10_SizeSecondMax_
-            df_.sqrt_Xcore_T_Xcore_P_Ycore_T_Ycore_[i] = event.sqrt_Xcore_T_Xcore_P_Ycore_T_Ycore_
+            df_.loc[i, 'classID'] = event.classID
+            df_.loc[i, 'className'] = event.className
+            df_.loc[i, 'MSCW'] = event.MSCW
+            df_.loc[i, 'MSCL'] = event.MSCL
+            df_.loc[i, 'log10_EChi2S_'] = event.log10_EChi2S_
+            df_.loc[i, 'log10_EmissionHeightChi2_'] = event.log10_EmissionHeightChi2_
+            df_.loc[i, 'log10_SizeSecondMax_'] = event.log10_SizeSecondMax_
+            df_.loc[i, 'sqrt_Xcore_T_Xcore_P_Ycore_T_Ycore_'] = event.sqrt_Xcore_T_Xcore_P_Ycore_T_Ycore_
             # NImages, Xoff, Yoff not used:
-            df_.NImages[i] = 0.0
-            df_.Xoff[i] = 0.0
-            df_.Yoff[i] = 0.0
-            df_.ErecS[i] = event.ErecS
-            df_.weight[i] = event.weight
-            df_.BDT_0[i] = event.BDT_0
+            df_.loc[i, 'NImages'] = 0.0
+            df_.loc[i, 'Xoff'] = 0.0
+            df_.loc[i, 'Yoff'] = 0.0
+            df_.loc[i, 'ErecS'] = event.ErecS
+            df_.loc[i, 'weight'] = event.weight
+            df_.loc[i, 'BDT_0'] = event.BDT_0
         if test:
             if not hasattr(self, 'TestTree'):
                 self.TestTree=df_
