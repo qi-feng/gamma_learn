@@ -114,7 +114,8 @@ class PyVAnaSumData:
         if not hasattr(self, 'OnEvts'):
             print "No data frame for on events found, running self.get_data_on() now!"
             self.get_data_on()
-        self.BDTon = self.OnEvts.drop(['Elevation','runNumber','eventNumber','MJD', 'Time', 'theta2', 'MVA', 'IsGamma'],axis=1)
+        self.BDTon = self.OnEvts.drop(['Elevation','runNumber','eventNumber','MJD', 'Time', 'theta2',
+                                       'NImages','Xoff','Yoff', 'ErecS', 'MVA', 'IsGamma'],axis=1)
         self.BDT_ErecS = self.OnEvts.ErecS
         self.BDT_Elevation = self.OnEvts.Elevation
         self.E_bins=np.digitize(self.BDT_ErecS, self.E_grid)-1
@@ -215,7 +216,8 @@ class PyVAnaSumData:
         if not hasattr(self, 'OffEvts'):
             print "No data frame for off events found, running self.get_data_off() now!"
             self.get_data_off()
-        self.BDToff = self.OffEvts.drop(['Elevation','runNumber','eventNumber','MJD', 'Time', 'theta2', 'MVA', 'IsGamma'],axis=1)
+        self.BDToff = self.OffEvts.drop(['Elevation','runNumber','eventNumber','MJD', 'Time', 'theta2',
+                                         'NImages','Xoff','Yoff', 'ErecS', 'MVA', 'IsGamma'],axis=1)
         self.BDT_ErecS_off = self.OffEvts.ErecS
         self.BDT_Elevation_off = self.OffEvts.Elevation
         self.E_bins_off=np.digitize(self.BDT_ErecS_off, self.E_grid)-1
@@ -355,7 +357,8 @@ class PyVMSCWData:
         if not hasattr(self, 'EventsDF'):
             print "No data frame for on events found, running self.get_data() now!"
             self.get_data()
-        self.BDT = self.EventsDF.drop(['Elevation','runNumber','eventNumber','MJD', 'Time', 'theta2', 'MVA', 'IsGamma'],axis=1)
+        self.BDT = self.EventsDF.drop(['Elevation','runNumber','eventNumber','MJD', 'Time', 'theta2',
+                                       'NImages','Xoff','Yoff', 'ErecS', 'MVA', 'IsGamma'],axis=1)
         # Deal with NaN and Inf:
         self.BDT = self.BDT.replace([np.inf, -np.inf], np.nan)
         self.BDT = self.BDT.fillna(0)
@@ -512,14 +515,16 @@ class PyVBDTData:
             if not hasattr(self, 'TestTree'):
                 print "No TestTree found, running self.get_tree() now!"
                 self.get_tree(test=test)
-            x = np.array(self.TestTree.drop(['classID','className','weight','BDT_0'],axis=1).values)
+            x = np.array(self.TestTree.drop(['classID','className', 'NImages','Xoff','Yoff', 'ErecS',
+                                             'weight','BDT_0'],axis=1).values)
             y = data['classID']
             self.test_y = y.values.astype(np.int32)
         else:
             if not hasattr(self, 'TrainTree'):
                 print "No TrainTree found, running self.get_tree() now!"
                 self.get_tree(test=test)
-            x = np.array(self.TrainTree.drop(['classID','className','weight','BDT_0'],axis=1).values)
+            x = np.array(self.TrainTree.drop(['classID','className', 'NImages','Xoff','Yoff', 'ErecS',
+                                              'weight','BDT_0'],axis=1).values)
             y = data['classID']
             self.train_y = y.values.astype(np.int32)
         if scaler==None:
@@ -627,7 +632,7 @@ def read_data(filename='BDT_1_1.txt', predict=False, scaler=None, fit_transform=
     # x has columns: ['MSCW','MSCL','log10_EChi2S_','EmissionHeight',
     #              'log10_EmissionHeightChi2_','log10_SizeSecondMax_','sqrt_Xcore_T_Xcore_P_Ycore_T_Ycore_',
     #              'NImages','Xoff','Yoff','ErecS']
-    x = np.array(data.drop(['classID','className','weight','BDT_0'],axis=1).values)
+    x = np.array(data.drop(['classID','className', 'NImages','Xoff','Yoff', 'ErecS', 'weight','BDT_0'],axis=1).values)
     if fit_transform=='log':
         print "log transform the input features"
         x = scaler.fit_transform(np.log(x + 1.)).astype(np.float32)
@@ -676,8 +681,8 @@ def compare_two_anasum_on_off(file1, file2, label1=None, label2=None, mode='Off'
 def compare_sig_bkg(x, y, columns=None, save_eps=None):
     if columns==None:
         columns = ['MSCW','MSCL','log10_EChi2S_','EmissionHeight',
-                   'log10_EmissionHeightChi2_','log10_SizeSecondMax_','sqrt_Xcore_T_Xcore_P_Ycore_T_Ycore_',
-                   'NImages','Xoff','Yoff','ErecS']
+                   'log10_EmissionHeightChi2_','log10_SizeSecondMax_','sqrt_Xcore_T_Xcore_P_Ycore_T_Ycore_']
+                   #'NImages','Xoff','Yoff','ErecS']
     #x_sig=x[np.where(y==0),:]
     #x_bkg=x[np.where(y==1),:]
     fig, ax = plt.subplots(2, 4, figsize=(20, 10))
@@ -691,7 +696,7 @@ def compare_sig_bkg(x, y, columns=None, save_eps=None):
         #common_params = dict(bins=20, range=ranges[col], histtype='step',
         #                    normed=False, color=colors, label=labels, alpha=0.6)
         common_params = dict(bins=40, histtype='step',
-                            normed=False, color=colors, label=labels, alpha=0.8, lw=2.)
+                            normed=True, color=colors, label=labels, alpha=0.8, lw=2.)
         ax[col/4,col%4].hist((x[np.where(y==0),col], x[np.where(y==1),col]), **common_params)
         ax[col/4,col%4].set_xlabel(columns[col])
         ax[col/4,col%4].set_ylabel(r'Density')
@@ -708,7 +713,7 @@ def read_ED_anasum_data(filename='test_Crab_V6_ED_RE.txt', scaler=None, fit_tran
     data.columns=['runNum','evtNum','MSCW','MSCL','log10_EChi2S_','EmissionHeight',
                   'log10_EmissionHeightChi2_','log10_SizeSecondMax_','sqrt_Xcore_T_Xcore_P_Ycore_T_Ycore_',
                   'NImages','Xoff','Yoff','ErecS','IsGamma']
-    x = np.array(data.drop(['runNum','evtNum','IsGamma'],axis=1).values)
+    x = np.array(data.drop(['runNum','evtNum', 'NImages','Xoff','Yoff', 'ErecS', 'IsGamma'],axis=1).values)
     if not scaler:
         print "Warning: scaler not provided for prediction data!"
         scaler = StandardScaler()
