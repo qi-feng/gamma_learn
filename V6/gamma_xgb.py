@@ -274,16 +274,26 @@ class PyVMSCWData:
         #                    [0.785051, 0.529877, 0.841851, 0.627616],
         #                    [0.523119, 0.510707, 0.603432, 0.509341]])
         # cuts based on tpr > 0.95: , ...
-        self.cuts=np.array([[0.186732, 0.183898, 0.194447, 0.0811499],
-                            [0.140657, 0.345577, 0.176298, 0.245122],
-                            [0.166601, 0.0739614, 0.190948, 0.0990855],
-                            [0.103235, 0.0879398, 0.092102, 0.0878038]])
+        #self.cuts=np.array([[ 0.659284,    0.64659822,  0.63679743,  0.84478045],
+        #                    [ 0.7204957,   0.70587277,  0.65938962,  0.67574859],
+        #                    [ 0.71535945,  0.84812295,  0.69521129,  0.81595933],
+        #                    [ 0.81004167,  0.82294106,  0.84064054,  0.83605647]])
+        #below is old
+        #self.cuts=np.array([[0.186732, 0.183898, 0.194447, 0.0811499],
+        #                    [0.140657, 0.345577, 0.176298, 0.245122],
+        #                    [0.166601, 0.0739614, 0.190948, 0.0990855],
+        #                    [0.103235, 0.0879398, 0.092102, 0.0878038]])
         # cuts based on tpr > 0.99: , ...
         #self.cuts=np.array([[],
         #                    [],
         #                    [],
         #                    []])
         # cuts based on fpr < 0.01: 0.932055,...
+        self.cuts=np.array([[ 0.8947593,   0.89301538,  0.89552283,  0.93508875],
+                            [ 0.85695302,  0.87792468,  0.90711033,  0.89587784],
+                            [ 0.84110248,  0.93541694,  0.89335871,  0.94792783],
+                            [ 0.91517889,  0.93389654,  0.94693136,  0.93158126]])
+        #below is old
         #self.cuts=np.array([[0.932055, 0.942873, 0.923558, 0.845185],
         #                    [0.921017, 0.985742, 0.936361, 0.999639],
         #                    [0.957725, 0.868326, 0.967239, 0.930004],
@@ -814,6 +824,18 @@ def plot_pseudo_TMVA(model_file="BDT11.model", train_file="V6/BDT_1_1_V6.txt", t
     test_x, test_y =read_data_xgb(test_file, predict=True)
     predict_train_y = clf.predict(train_x)
     predict_test_y = clf.predict(test_x)
+    diff_tpr_fpr=tpr_test-fpr_test
+    thresh_index_fpr = np.argmin(fpr_test<=(1-thresh_IsGamma))
+    thresh_index_tpr = np.argmax(tpr_test>=thresh_IsGamma)
+    thresh_index2 = np.where(diff_tpr_fpr==np.max(diff_tpr_fpr))
+    print "Note that below TMVA threshold [-1, 1] is used instead of probability"
+    print "However, note that thresh_IsGamma should be given in probability"
+    print "Threshold tpr>="+str(thresh_IsGamma)+" is "+str(thresh_test[thresh_index_tpr]*2-1)
+    print "Threshold fpr<="+str(1-thresh_IsGamma)+" is "+str(thresh_test[thresh_index_fpr]*2-1)
+    print "Threshold index found ", thresh_index2
+    for ind_ in thresh_index2:
+        for ind in ind_:
+            print "TMVA Threshold max diff", thresh_test[ind]*2-1
     plt.figure()
     sns.distplot(predict_train_y[np.where(train_y==1)]*2.-1.,
                  bins=nbins, hist=True, kde=ifKDE, rug=False,
@@ -831,6 +853,11 @@ def plot_pseudo_TMVA(model_file="BDT11.model", train_file="V6/BDT_1_1_V6.txt", t
     sns.distplot(predict_test_y[np.where(test_y==0)]*2.-1.,
                  color='r', bins=nbins, hist=True, kde=ifKDE, rug=False,
                  label="Test Background", norm_hist=norm_hist)
+    for ind_ in thresh_index2:
+        for ind in ind_:
+            plt.axvline(thresh_test[ind]*2-1,color='orange', label='thresh diff_tpr_fpr_test '+str(thresh_test[ind]*2-1))
+    plt.axvline(thresh_test[thresh_index_tpr]*2-1,color='green', label='thresh tpr_test '+str(thresh_test[thresh_index_tpr]*2-1))
+    plt.axvline(thresh_test[thresh_index_fpr]*2-1,color='magenta', label='thresh fpr_test '+str(thresh_test[thresh_index_fpr]*2-1))
     plt.legend(loc='best');
     if norm_hist:
         sns.axlabel("Pseudo TMVA value","Normalized event counts")
@@ -865,22 +892,8 @@ def plot_pseudo_TMVA(model_file="BDT11.model", train_file="V6/BDT_1_1_V6.txt", t
     if(plot_tmva_roc==True):
         # Plot TMVA ROC curve
         plt.figure(figsize=(6, 6))
-        #thresh_IsGamma=0.95
-        #thresh_index=np.argmax(tpr_test>=thresh_IsGamma)
-        #ratio_tpr_fpr=np.array(tpr_test/fpr_test)
-        #ratio_tpr_fpr[ratio_tpr_fpr==np.inf]=0
-        diff_tpr_fpr=tpr_test-fpr_test
-        thresh_index_fpr = np.argmin(fpr_test<=(1-thresh_IsGamma))
-        thresh_index_tpr = np.argmax(tpr_test>=thresh_IsGamma)
-        thresh_index2 = np.where(diff_tpr_fpr==np.max(diff_tpr_fpr))
-        print "Note that below TMVA threshold [-1, 1] is used instead of probability"
-        print "However, note that thresh_IsGamma should be given in probability"
-        print "Threshold tpr>="+str(thresh_IsGamma)+" is "+str(thresh_test[thresh_index_tpr]*2-1)
-        print "Threshold fpr<="+str(1-thresh_IsGamma)+" is "+str(thresh_test[thresh_index_fpr]*2-1)
-        print "Threshold index found ", thresh_index2
         for ind_ in thresh_index2:
             for ind in ind_:
-                print "TMVA Threshold", thresh_test[ind]*2-1
                 plt.axvline(thresh_test[ind]*2-1,color='orange', label='thresh diff_tpr_fpr_test '+str(thresh_test[ind]*2-1))
         #thresh_test[thresh_index]*2-1
         np.max(tpr_test-fpr_test)
@@ -901,7 +914,7 @@ def plot_pseudo_TMVA(model_file="BDT11.model", train_file="V6/BDT_1_1_V6.txt", t
         plt.legend(loc="best")
         plt.savefig(outfile+'_efficiency.png', format='png', dpi=500)
         #return threshold that tpr>=IsGamma and fpr<1-IsGamma
-        return thresh_test[thresh_index_tpr]*2-1, thresh_test[thresh_index_fpr]*2-1
+    return thresh_test[thresh_index_tpr]*2-1, thresh_test[thresh_index_fpr]*2-1
 
 def plot_all_xgb_models(thresh_IsGamma=0.99):
     thresh_tpr = np.zeros((4,4))
