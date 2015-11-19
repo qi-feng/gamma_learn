@@ -269,15 +269,16 @@ class PyVMSCWData:
         #                    [0.296128, 0.143885, 0.433343, 0.246594],
         #                    [0.181648, 0.196016, 0.205474, 0.18396]])
         # cuts based on fpr < 0.05: 0.743973,...
+        self.cuts=np.array([[ 0.659284,    0.64659822,  0.63679743,  0.84478045],
+                            [ 0.7204957,   0.70587277,  0.65938962,  0.67574859],
+                            [ 0.71535945,  0.84812295,  0.69521129,  0.81595933],
+                            [ 0.81004167,  0.82294106,  0.84064054,  0.83605647]])
+        #old below
         #self.cuts=np.array([[0.743973, 0.762595, 0.716348, 0.598079],
         #                    [0.669947, 0.942136, 0.677616, 0.997168],
         #                    [0.785051, 0.529877, 0.841851, 0.627616],
         #                    [0.523119, 0.510707, 0.603432, 0.509341]])
         # cuts based on tpr > 0.95: , ...
-        #self.cuts=np.array([[ 0.659284,    0.64659822,  0.63679743,  0.84478045],
-        #                    [ 0.7204957,   0.70587277,  0.65938962,  0.67574859],
-        #                    [ 0.71535945,  0.84812295,  0.69521129,  0.81595933],
-        #                    [ 0.81004167,  0.82294106,  0.84064054,  0.83605647]])
         #below is old
         #self.cuts=np.array([[0.186732, 0.183898, 0.194447, 0.0811499],
         #                    [0.140657, 0.345577, 0.176298, 0.245122],
@@ -289,10 +290,10 @@ class PyVMSCWData:
         #                    [],
         #                    []])
         # cuts based on fpr < 0.01: 0.932055,...
-        self.cuts=np.array([[ 0.8947593,   0.89301538,  0.89552283,  0.93508875],
-                            [ 0.85695302,  0.87792468,  0.90711033,  0.89587784],
-                            [ 0.84110248,  0.93541694,  0.89335871,  0.94792783],
-                            [ 0.91517889,  0.93389654,  0.94693136,  0.93158126]])
+        #self.cuts=np.array([[ 0.8947593,   0.89301538,  0.89552283,  0.93508875],
+        #                    [ 0.85695302,  0.87792468,  0.90711033,  0.89587784],
+        #                    [ 0.84110248,  0.93541694,  0.89335871,  0.94792783],
+        #                    [ 0.91517889,  0.93389654,  0.94693136,  0.93158126]])
         #below is old
         #self.cuts=np.array([[0.932055, 0.942873, 0.923558, 0.845185],
         #                    [0.921017, 0.985742, 0.936361, 0.999639],
@@ -373,7 +374,8 @@ class PyVMSCWData:
                                        'NImages','Xoff','Yoff', 'ErecS', 'MVA', 'IsGamma'],axis=1)
         # Deal with NaN and Inf:
         self.BDT = self.BDT.replace([np.inf, -np.inf], np.nan)
-        self.BDT = self.BDT.fillna(0)
+        # which value to fill?
+        self.BDT = self.BDT.fillna(1)
 
         self.BDT_ErecS = self.EventsDF.ErecS
         self.BDT_Elevation = self.EventsDF.Elevation
@@ -415,7 +417,7 @@ class PyVMSCWData:
                 clf = xgb.Booster() #init model
                 clf.load_model(modelname) # load model
                 predict_y = clf.predict(xgb.DMatrix(predict_x))
-                self.EventsDF.MVA.values[np.where((self.E_bins==E) & (self.Z_bins==Z))] = predict_y
+                self.EventsDF.MVA.values[np.where((self .E_bins==E) & (self.Z_bins==Z))] = predict_y
                 # !!! fill the gamma/hadron flag, use a simple 0.5 for now !!!
                 #self.EventsDF.IsGamma.values[np.where((self.E_bins==E) & (self.Z_bins==Z))] = (predict_y>self.cuts[E][Z]).astype(np.float)
                 # !!!! adopting the usual 1 is signal........
@@ -844,6 +846,7 @@ def plot_pseudo_TMVA(model_file="BDT11.model", train_file="V6/BDT_1_1_V6.txt", t
     for ind_ in thresh_index2:
         for ind in ind_:
             print "TMVA Threshold max diff", thresh_test[ind]*2-1
+            thresh_maxdiff = thresh_test[ind]*2-1
     plt.figure()
     sns.distplot(predict_train_y[np.where(train_y==1)]*2.-1.,
                  bins=nbins, hist=True, kde=ifKDE, rug=False,
@@ -913,16 +916,17 @@ def plot_pseudo_TMVA(model_file="BDT11.model", train_file="V6/BDT_1_1_V6.txt", t
         plt.title('ROC curve in the TMVA way')
         plt.legend(loc="best")
         plt.savefig(outfile+'_efficiency.png', format='png', dpi=500)
-        #return threshold that tpr>=IsGamma and fpr<1-IsGamma
-    return thresh_test[thresh_index_tpr]*2-1, thresh_test[thresh_index_fpr]*2-1
+        #return threshold that tpr>=IsGamma and fpr<1-IsGamma and maxdiff
+    return thresh_test[thresh_index_tpr]*2-1, thresh_test[thresh_index_fpr]*2-1, thresh_maxdiff
 
 def plot_all_xgb_models(thresh_IsGamma=0.99):
     thresh_tpr = np.zeros((4,4))
     thresh_fpr = np.zeros((4,4))
+    thresh_maxdiff = np.zeros((4,4))
     for i in [0,1,2,3]:
         for j in range(4):
             print "Working on BDT"+str(i)+str(j)+".model"
-            thresh_tpr[i][j], thresh_fpr[i][j] = plot_pseudo_TMVA(model_file="BDT"+str(i)+str(j)+".model",
+            thresh_tpr[i][j], thresh_fpr[i][j], thresh_maxdiff[i][j] = plot_pseudo_TMVA(model_file="BDT"+str(i)+str(j)+".model",
                                                                   train_file="./BDT_"+str(i)+'_'+str(j)+"_V6.txt",
                                                                   test_file="./BDT_"+str(i)+'_'+str(j)+"_Test_V6.txt",
                                                                   ifKDE=False,
@@ -931,6 +935,7 @@ def plot_all_xgb_models(thresh_IsGamma=0.99):
                                                                   norm_hist=True, thresh_IsGamma=thresh_IsGamma)
     print "Threshold tpr>="+str(thresh_IsGamma)+" is ", thresh_tpr
     print "Threshold fpr<="+str(1-thresh_IsGamma)+" is ", thresh_fpr
+    print "Threshold max diff between tpr and fpr is ", thresh_maxdiff
 
 
 if __name__ == '__main__':
