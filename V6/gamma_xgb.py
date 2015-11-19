@@ -824,6 +824,14 @@ def plot_pseudo_TMVA(model_file="BDT11.model", train_file="V6/BDT_1_1_V6.txt", t
     test_x, test_y =read_data_xgb(test_file, predict=True)
     predict_train_y = clf.predict(train_x)
     predict_test_y = clf.predict(test_x)
+    # Compute ROC curve and ROC area
+    # roc_auc = dict()
+    fpr, tpr, thresh = roc_curve(train_y,predict_train_y)
+    roc_auc = auc(fpr, tpr)
+    fpr_test, tpr_test, thresh_test = roc_curve(test_y,predict_test_y)
+    roc_auc_test = auc(fpr_test, tpr_test)
+    print 'The training AUC score is {0}, and the test AUC score is: {1}'.format(
+            roc_auc, roc_auc_test)
     diff_tpr_fpr=tpr_test-fpr_test
     thresh_index_fpr = np.argmin(fpr_test<=(1-thresh_IsGamma))
     thresh_index_tpr = np.argmax(tpr_test>=thresh_IsGamma)
@@ -865,14 +873,6 @@ def plot_pseudo_TMVA(model_file="BDT11.model", train_file="V6/BDT_1_1_V6.txt", t
     else:
         sns.axlabel("Pseudo TMVA value","Event counts")
         plt.savefig(outfile+'counts.png', format='png', dpi=500)
-    # Compute ROC curve and ROC area
-    # roc_auc = dict()
-    fpr, tpr, thresh = roc_curve(train_y,predict_train_y)
-    roc_auc = auc(fpr, tpr)
-    fpr_test, tpr_test, thresh_test = roc_curve(test_y,predict_test_y)
-    roc_auc_test = auc(fpr_test, tpr_test)
-    print 'The training AUC score is {0}, and the test AUC score is: {1}'.format(
-            roc_auc, roc_auc_test)
     if(plot_roc==True):
         # Plot ROC curve
         plt.figure()
