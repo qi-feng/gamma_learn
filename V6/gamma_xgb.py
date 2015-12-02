@@ -1,7 +1,5 @@
 __author__ = 'qfeng'
 
-__author__ = 'qfeng'
-
 import numpy as np
 import datetime
 import matplotlib.pyplot as plt
@@ -97,6 +95,7 @@ class PyVAnaSumData:
                 df_.theta2[i] = event.theta2
                 df_.MSCW[i] = event.MSCW
                 df_.MSCL[i] = event.MSCL
+                df_.EmissionHeight[i] = event.EmissionHeight
                 df_.ErecS[i] = event.ErecS
                 df_.log10_EChi2S_[i] = log10_EChi2S_
                 df_.log10_EmissionHeightChi2_[i] = log10_EmissionHeightChi2_
@@ -200,6 +199,7 @@ class PyVAnaSumData:
                 df_.MSCW[i] = event.MSCW
                 df_.MSCL[i] = event.MSCL
                 df_.ErecS[i] = event.ErecS
+                df_.EmissionHeight[i] = event.EmissionHeight
                 df_.log10_EChi2S_[i] = log10_EChi2S_
                 df_.log10_EmissionHeightChi2_[i] = log10_EmissionHeightChi2_
                 df_.log10_SizeSecondMax_[i] = log10_SizeSecondMax_
@@ -259,6 +259,11 @@ class PyVMSCWData:
         self.E_grid=np.array([0.08, 0.32, 0.5, 1.0, 50.0])
         self.Zen_grid=np.array([0.0, 25.0, 32.5, 42.5, 75.])
         # cuts based on diff between tpr and fpr
+        #self.cuts=np.array([[ 0.02593851, -0.01989901, -0.02687389,  0.43440866],
+        #                    [-0.00217962, -0.05718732,  0.01947999,  0.02570164],
+        #                    [-0.01606256,  0.35608768, -0.0221144 ,  0.34758008],
+        #                    [ 0.31902242,  0.36384165,  0.39987564,  0.36961806]])
+
         #self.cuts=np.array([[0.01841879,0.05553091,0.02724016,-0.35556817],
         #                    [-0.04491699,0.69762886,0.0508287,0.28274822],
         #                    [0.20882559,-0.42245674,0.35600829,-0.28852916],
@@ -269,26 +274,31 @@ class PyVMSCWData:
         #                    [0.296128, 0.143885, 0.433343, 0.246594],
         #                    [0.181648, 0.196016, 0.205474, 0.18396]])
         # cuts based on fpr < 0.05: 0.743973,...
-        self.cuts=np.array([[ 0.659284,    0.64659822,  0.63679743,  0.84478045],
-                            [ 0.7204957,   0.70587277,  0.65938962,  0.67574859],
-                            [ 0.71535945,  0.84812295,  0.69521129,  0.81595933],
-                            [ 0.81004167,  0.82294106,  0.84064054,  0.83605647]])
+        #self.cuts=np.array([[ 0.659284,    0.64659822,  0.63679743,  0.84478045],
+        #                    [ 0.7204957,   0.70587277,  0.65938962,  0.67574859],
+        #                    [ 0.71535945,  0.84812295,  0.69521129,  0.81595933],
+        #                    [ 0.81004167,  0.82294106,  0.84064054,  0.83605647]])
         #old below
         #self.cuts=np.array([[0.743973, 0.762595, 0.716348, 0.598079],
         #                    [0.669947, 0.942136, 0.677616, 0.997168],
         #                    [0.785051, 0.529877, 0.841851, 0.627616],
         #                    [0.523119, 0.510707, 0.603432, 0.509341]])
         # cuts based on tpr > 0.95: , ...
+        #self.cuts=np.array([[-0.52311379,-0.49824756,-0.49955165,-0.19220001],
+        #                   [-0.43455112,-0.40995073,-0.33682871,-0.52316722],
+        #                   [-0.43315935,-0.08327794,-0.38275278,-0.08107513],
+        #                   [-0.04773813,-0.01026404,-0.04795384,0.0277952]])
+
         #below is old
         #self.cuts=np.array([[0.186732, 0.183898, 0.194447, 0.0811499],
         #                    [0.140657, 0.345577, 0.176298, 0.245122],
         #                    [0.166601, 0.0739614, 0.190948, 0.0990855],
         #                    [0.103235, 0.0879398, 0.092102, 0.0878038]])
         # cuts based on tpr > 0.99: , ...
-        #self.cuts=np.array([[],
-        #                    [],
-        #                    [],
-        #                    []])
+        #self.cuts=np.array([[-0.87157854, -0.86164297, -0.84720843, -0.66418508],
+        #                   [-0.8689404,  -0.86485597, -0.86854479, -0.86172146],
+        #                   [-0.88265266, -0.74326044, -0.86211933, -0.73849073],
+        #                   [-0.79349622, -0.77504797, -0.77059993, -0.72406289]])
         # cuts based on fpr < 0.01: 0.932055,...
         #self.cuts=np.array([[ 0.8947593,   0.89301538,  0.89552283,  0.93508875],
         #                    [ 0.85695302,  0.87792468,  0.90711033,  0.89587784],
@@ -304,6 +314,12 @@ class PyVMSCWData:
         #                    [0.955311, 0.991051, 0.966303, 0.999719],
         #                    [0.974992, 0.9178,   0.980435, 0.966418],
         #                    [0.942434, 0.930608, 0.946548, 0.929107]])
+        # cuts based on tpr > 0.995:
+        self.cuts=np.array([[-0.92426705, -0.91551454, -0.90352066, -0.7667466 ],
+                            [-0.92712007, -0.92634553, -0.93168149, -0.90905616],
+                            [-0.93170046, -0.84021266, -0.92142534, -0.84285684],
+                            [-0.88808747, -0.87293372, -0.86932586, -0.84854317]])
+
 
         if filename:
             self.filename = filename
@@ -353,6 +369,7 @@ class PyVMSCWData:
             df_.MSCL[i] = event.MSCL
             df_.ErecS[i] = event.ErecS
             df_.log10_EChi2S_[i] = log10_EChi2S_
+            df_.EmissionHeight[i] = event.EmissionHeight
             df_.log10_EmissionHeightChi2_[i] = log10_EmissionHeightChi2_
             df_.log10_SizeSecondMax_[i] = log10_SizeSecondMax_
             df_.sqrt_Xcore_T_Xcore_P_Ycore_T_Ycore_[i] = sqrt_Xcore_T_Xcore_P_Ycore_T_Ycore_
@@ -508,6 +525,7 @@ class PyVBDTData:
             df_.loc[i, 'MSCW'] = event.MSCW
             df_.loc[i, 'MSCL'] = event.MSCL
             df_.loc[i, 'log10_EChi2S_'] = event.log10_EChi2S_
+            df_.loc[i, 'EmissionHeight'] = event.EmissionHeight
             df_.loc[i, 'log10_EmissionHeightChi2_'] = event.log10_EmissionHeightChi2_
             df_.loc[i, 'log10_SizeSecondMax_'] = event.log10_SizeSecondMax_
             df_.loc[i, 'sqrt_Xcore_T_Xcore_P_Ycore_T_Ycore_'] = event.sqrt_Xcore_T_Xcore_P_Ycore_T_Ycore_
