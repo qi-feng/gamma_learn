@@ -29,7 +29,11 @@ import xgboost as xgb
 from sklearn.metrics import roc_auc_score, roc_curve, auc
 import seaborn as sns
 
-import ROOT
+try:
+    import ROOT
+except:
+    print "Can't import ROOT, no related funcionality possible"
+    print "But we are carrying on, assuming only running xgb stuff"
 
 class PyVAnaSumData:
     ############################################################################
@@ -121,7 +125,7 @@ class PyVAnaSumData:
         self.BDT_Elevation = self.OnEvts.Elevation
         self.E_bins=np.digitize(self.BDT_ErecS, self.E_grid)-1
         self.Z_bins=np.digitize((90.-self.BDT_Elevation), self.Zen_grid)-1
-    def predict_BDT_on(self, modelpath='.', modelbase='BDT', modelext='.model', scaler=None,fit_transform=None):
+    def predict_BDT_on(self, modelpath='.', modelbase='BDT', modelext='.model', scaler=None,fit_transform='empirical_scale'):
         if not hasattr(self, 'OnEvts'):
             print "No data frame for on events found, running self.get_data_on() now!"
             self.get_data_on()
@@ -133,6 +137,8 @@ class PyVAnaSumData:
             self.BDTon = scaler.fit_transform(np.log(self.BDTon + 1.)).astype(np.float32)
         elif fit_transform=='linear':
             self.BDTon = scaler.fit_transform(self.BDTon).astype(np.float32)
+        elif fit_transform=='empirical_scale':
+            self.BDTon = self.BDTon.values.astype(np.float32)*np.array([1, 1, 0.5, 0.05, 0.25, 0.2, 0.005])
         else:
             self.BDTon = self.BDTon.values.astype(np.float32)
         # Now divide into bins in ErecS and Zen
@@ -224,7 +230,7 @@ class PyVAnaSumData:
         self.BDT_Elevation_off = self.OffEvts.Elevation
         self.E_bins_off=np.digitize(self.BDT_ErecS_off, self.E_grid)-1
         self.Z_bins_off=np.digitize((90.-self.BDT_Elevation_off), self.Zen_grid)-1
-    def predict_BDT_off(self, modelpath='.', modelbase='BDT', modelext='.model', scaler=None,fit_transform=None):
+    def predict_BDT_off(self, modelpath='.', modelbase='BDT', modelext='.model', scaler=None,fit_transform='empirical_scale'):
         if not hasattr(self, 'OffEvts'):
             print "No data frame for off events found, running self.get_data_off() now!"
             self.get_data_off()
@@ -236,6 +242,8 @@ class PyVAnaSumData:
             self.BDToff = scaler.fit_transform(np.log(self.BDToff + 1.)).astype(np.float32)
         elif fit_transform=='linear':
             self.BDToff = scaler.fit_transform(self.BDToff).astype(np.float32)
+        elif fit_transform=='empirical_scale':
+            self.BDToff = self.BDToff.values.astype(np.float32)*np.array([1, 1, 0.5, 0.05, 0.25, 0.2, 0.005])
         else:
             self.BDToff = self.BDToff.values.astype(np.float32)
         # Now divide into bins in ErecS and Zen
@@ -405,7 +413,7 @@ class PyVMSCWData:
         #                    [-0.04491699,0.69762886,0.0508287,0.28274822],
         #                    [0.20882559,-0.42245674,0.35600829,-0.28852916],
         #                    [-0.29889989,-0.36590242,-0.26210219,-0.30039829]])
-    def predict_BDT(self, modelpath='.', modelbase='BDT', modelext='.model', scaler=None,fit_transform=None):
+    def predict_BDT(self, modelpath='.', modelbase='BDT', modelext='.model', scaler=None,fit_transform='empirical_scale'):
         if not hasattr(self, 'EventsDF'):
             print "No data frame for on events found, running self.get_data() now!"
             self.get_data()
@@ -417,6 +425,8 @@ class PyVMSCWData:
             self.BDT = scaler.fit_transform(np.log(self.BDT + 1.)).astype(np.float32)
         elif fit_transform=='linear':
             self.BDT = scaler.fit_transform(self.BDT).astype(np.float32)
+        elif fit_transform=='empirical_scale':
+            self.BDT = self.BDT.values.astype(np.float32)*np.array([1, 1, 0.5, 0.05, 0.25, 0.2, 0.005])
         else:
             self.BDT = self.BDT.values.astype(np.float32)
         # Deal with NaN and Inf:
@@ -542,7 +552,7 @@ class PyVBDTData:
         else:
             if not hasattr(self, 'TrainTree'):
                 self.TrainTree=df_
-    def make_features(self, test=False, fit_transform=None, scaler=None):
+    def make_features(self, test=False, fit_transform='empirical_scale', scaler=None):
         if test:
             if not hasattr(self, 'TestTree'):
                 print "No TestTree found, running self.get_tree() now!"
@@ -567,6 +577,8 @@ class PyVBDTData:
         elif fit_transform=='linear':
             print "linear transform the input features"
             x = scaler.fit_transform(x).astype(np.float32)
+        elif fit_transform=='empirical_scale':            
+            x = x.astype(np.float32)*np.array([1, 1, 0.5, 0.05, 0.25, 0.2, 0.005])
         else:
             print "no transforms on the input features"
             x = x.astype(np.float32)
@@ -580,7 +592,7 @@ class PyVBDTData:
                max_depth=15, eta=0.04, gamma=5, subsample=0.6,colsample_bytree=0.7,
                num_round=500, predict_file=None, early_stop=50, test_ratio=0.2):
         if not hasattr(self, 'train_x'):
-            self.make_features(test=False, fit_transform=None, scaler=None)
+            self.make_features(test=False, fit_transform='empirical_scale', scaler=None)
         sss = StratifiedShuffleSplit(self.train_y, test_size=test_ratio, random_state=1234)
         for train_index, test_index in sss:
             break
@@ -638,7 +650,7 @@ class PyVBDTData:
             if dump_raw:
                 self.clf_xgb.dump_model(outfile+'dump.raw.txt')
 
-def read_data(filename='BDT_1_1.txt', predict=False, scaler=None, fit_transform=None):
+def read_data(filename='BDT_1_1.txt', predict=False, scaler=None, fit_transform='empirical_scale'):
     if predict==True:
         print "Read data for prediction..."
         x = pd.read_csv(filename)
@@ -651,6 +663,8 @@ def read_data(filename='BDT_1_1.txt', predict=False, scaler=None, fit_transform=
             x = scaler.fit_transform(np.log(x + 1.)).astype(np.float32)
         elif fit_transform=='linear':
             x = scaler.fit_transform(x).astype(np.float32)
+        elif fit_transform=='empirical_scale':
+            x = x.astype(np.float32)*np.array([1, 1, 0.5, 0.05, 0.25, 0.2, 0.005])
         else:
             x = x.astype(np.float32)
         return x
@@ -662,14 +676,16 @@ def read_data(filename='BDT_1_1.txt', predict=False, scaler=None, fit_transform=
     scaler = StandardScaler()
     #x = np.array(data.drop(['classID','className','BDT_0'],axis=1).values)
     # x has columns: ['MSCW','MSCL','log10_EChi2S_','EmissionHeight',
-    #              'log10_EmissionHeightChi2_','log10_SizeSecondMax_','sqrt_Xcore_T_Xcore_P_Ycore_T_Ycore_',
-    #              'NImages','Xoff','Yoff','ErecS']
+    #              'log10_EmissionHeightChi2_','log10_SizeSecondMax_','sqrt_Xcore_T_Xcore_P_Ycore_T_Ycore_'], a total of 7 features
+    # these are not used anymore:             ['NImages','Xoff','Yoff','ErecS']
     x = np.array(data.drop(['classID','className', 'NImages','Xoff','Yoff', 'ErecS', 'weight','BDT_0'],axis=1).values)
     if fit_transform=='log':
         print "log transform the input features"
         x = scaler.fit_transform(np.log(x + 1.)).astype(np.float32)
     elif fit_transform=='linear':
         x = scaler.fit_transform(x).astype(np.float32)
+    elif fit_transform=='empirical_scale':
+        x = x.astype(np.float32)*np.array([1, 1, 0.5, 0.05, 0.25, 0.2, 0.005])
     else:
         x = x.astype(np.float32)
     y = 1-data['classID']
@@ -739,7 +755,7 @@ def compare_sig_bkg(x, y, columns=None, save_eps=None):
         plt.savefig(save_eps, format='eps', dpi=500)
     return fig, plt
 
-def read_ED_anasum_data(filename='test_Crab_V6_ED_RE.txt', scaler=None, fit_transform=None):
+def read_ED_anasum_data(filename='test_Crab_V6_ED_RE.txt', scaler=None, fit_transform='empirical_scale'):
     print "Reading EventDisplay anasum data..."
     data = pd.read_csv(filename, header=None, sep=r"\s+")
     data.columns=['runNum','evtNum','MSCW','MSCL','log10_EChi2S_','EmissionHeight',
@@ -754,13 +770,15 @@ def read_ED_anasum_data(filename='test_Crab_V6_ED_RE.txt', scaler=None, fit_tran
         x = scaler.fit_transform(np.log(x + 1.)).astype(np.float32)
     elif fit_transform=='linear':
         x = scaler.fit_transform(x).astype(np.float32)
+    elif fit_transform=='empirical_scale':
+        x = x.astype(np.float32)*np.array([1, 1, 0.5, 0.05, 0.25, 0.2, 0.005])
     else:
         x = x.astype(np.float32)
     y = data['IsGamma']
     y = y.values.astype(np.int32)
     return x, y, scaler
 
-def read_data_xgb(filename='BDT_1_1.txt', predict=False, cv_ratio=0.1, scaler=None, fit_transform=None, random_state=1234):
+def read_data_xgb(filename='BDT_1_1.txt', predict=False, cv_ratio=0.1, scaler=None, fit_transform='empirical_scale', random_state=1234):
     if predict:
         x, y, _ = read_data(filename=filename, predict=False, scaler=scaler, fit_transform=fit_transform)
         dtestx = xgb.DMatrix(x)
@@ -780,7 +798,8 @@ def read_data_xgb(filename='BDT_1_1.txt', predict=False, cv_ratio=0.1, scaler=No
 
 def do_xgb(filename='BDT_1_1_V6.txt',search=False, logfile=None, max_depth=15, eta=0.04, gamma=5,
            subsample=0.6, colsample_bytree=0.7, num_round=200, predict_file=None,
-           early_stop=0, test_ratio=0.1, fit_transform=None):
+           early_stop=0, test_ratio=0.1, fit_transform='empirical_scale',
+           save_model=True, load_model=True):
     x,y,_ = read_data(filename=filename, fit_transform=fit_transform)
     sss = StratifiedShuffleSplit(y, test_size=test_ratio, random_state=1234)
     for train_index, test_index in sss:
@@ -798,12 +817,23 @@ def do_xgb(filename='BDT_1_1_V6.txt',search=False, logfile=None, max_depth=15, e
                     for sam in subsample:
                         for col in colsample_bytree:
                             param = {'max_depth':md, 'eta':eta_,'eval_metric':'auc', 'silent':1, 'objective':'binary:logistic', 'gamma':gamma_, 'subsample':sam, 'colsample_bytree':col }
-                            if early_stop>0:
-                                clf_xgb = xgb.train(param, dtrain, num_round, watchlist, early_stopping_rounds=early_stop)
-                                info3[md,eta_,gamma_,sam,col,clf_xgb.best_iteration] = clf_xgb.best_score
+                            model_found = False
+                            model_file = 'xgb_model_'+str(filename[4])+filename[6]+'_md'+str(md)+'_eta'+str(eta_)+'_gamma'+str(gamma_)+'_subsample'+str(sam)+'_colsample'+str(col)+'_earlystop'+str(early_stop)+'.model'
+                            if (load_model and os.path.exists(model_file)):
+                                clf_xgb = xgb.Booster() #init model
+                                clf_xgb.load_model(model_file) # load data
+                                model_found = True
+                                print "Model found, loading file ",model_file
                             else:
-                                clf_xgb = xgb.train(param, dtrain, num_round, watchlist)
-                                info3[md,eta_,gamma_,sam,col] = clf_xgb.eval(deval)
+                                if early_stop>0:
+                                    clf_xgb = xgb.train(param, dtrain, num_round, watchlist, early_stopping_rounds=early_stop)
+                                    info3[md,eta_,gamma_,sam,col,clf_xgb.best_iteration] = clf_xgb.best_score
+                                else:
+                                    clf_xgb = xgb.train(param, dtrain, num_round, watchlist)
+                                    info3[md,eta_,gamma_,sam,col] = clf_xgb.eval(deval)
+                            if (model_found==False) and (save_model):
+                                print "Model saved as ",model_file
+                                clf_xgb.save_model(model_file)
         if early_stop>0:
             score3 = np.array(info3.values())
         else:
@@ -817,7 +847,12 @@ def do_xgb(filename='BDT_1_1_V6.txt',search=False, logfile=None, max_depth=15, e
         return info3, score3
 
     param = {'max_depth':max_depth, 'eta':eta,'eval_metric':'auc', 'silent':1, 'objective':'binary:logistic', 'gamma':gamma, 'subsample':subsample, 'colsample_bytree':colsample_bytree}
-    if early_stop>0:
+    if (load_model and os.path.exists(model_file)):
+        clf_xgb = xgb.Booster() #init model
+        clf_xgb.load_model(model_file) # load data
+        model_found = True
+        print "Model found, loading file ",model_file
+    elif early_stop>0:
         clf_xgb = xgb.train(param, dtrain, num_round, watchlist, early_stopping_rounds=early_stop)
     else:
         clf_xgb = xgb.train(param, dtrain, num_round, watchlist)
