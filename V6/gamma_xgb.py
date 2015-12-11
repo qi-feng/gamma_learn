@@ -796,11 +796,9 @@ def read_data_xgb(filename='BDT_1_1.txt', predict=False, cv_ratio=0.1, scaler=No
         watchlist  = [(dtrain,'train'),(deval,'eval')]
         return watchlist
 
-def do_xgb(filename='BDT_1_1_V6.txt',search=False, logfile=None, max_depth=15, eta=0.04, gamma=5,
+def do_xgb_xy(x, y,search=False, logfile=None, max_depth=15, eta=0.04, gamma=5,
            subsample=0.6, colsample_bytree=0.7, num_round=200, predict_file=None,
-           early_stop=0, test_ratio=0.1, fit_transform='empirical_scale',
-           save_model=True, load_model=True):
-    x,y,_ = read_data(filename=filename, fit_transform=fit_transform)
+           early_stop=0, test_ratio=0.1):
     sss = StratifiedShuffleSplit(y, test_size=test_ratio, random_state=1234)
     for train_index, test_index in sss:
         break
@@ -808,6 +806,7 @@ def do_xgb(filename='BDT_1_1_V6.txt',search=False, logfile=None, max_depth=15, e
     test_x, test_y = x[test_index], y[test_index]
     dtrain = xgb.DMatrix(train_x, label= train_y)
     deval  = xgb.DMatrix(test_x, label=test_y)
+    watchlist  = [(dtrain,'train'),(deval,'eval')]
     watchlist  = [(dtrain,'train'),(deval,'eval')]
     if search==True:
         info3 = {}
@@ -817,23 +816,12 @@ def do_xgb(filename='BDT_1_1_V6.txt',search=False, logfile=None, max_depth=15, e
                     for sam in subsample:
                         for col in colsample_bytree:
                             param = {'max_depth':md, 'eta':eta_,'eval_metric':'auc', 'silent':1, 'objective':'binary:logistic', 'gamma':gamma_, 'subsample':sam, 'colsample_bytree':col }
-                            model_found = False
-                            model_file = 'xgb_model_'+str(filename[4])+filename[6]+'_md'+str(md)+'_eta'+str(eta_)+'_gamma'+str(gamma_)+'_subsample'+str(sam)+'_colsample'+str(col)+'_earlystop'+str(early_stop)+'.model'
-                            if (load_model and os.path.exists(model_file)):
-                                clf_xgb = xgb.Booster() #init model
-                                clf_xgb.load_model(model_file) # load data
-                                model_found = True
-                                print "Model found, loading file ",model_file
+                            if early_stop>0:
+                                clf_xgb = xgb.train(param, dtrain, num_round, watchlist, early_stopping_rounds=early_stop)
+                                info3[md,eta_,gamma_,sam,col,clf_xgb.best_iteration] = clf_xgb.best_score
                             else:
-                                if early_stop>0:
-                                    clf_xgb = xgb.train(param, dtrain, num_round, watchlist, early_stopping_rounds=early_stop)
-                                    info3[md,eta_,gamma_,sam,col,clf_xgb.best_iteration] = clf_xgb.best_score
-                                else:
-                                    clf_xgb = xgb.train(param, dtrain, num_round, watchlist)
-                                    info3[md,eta_,gamma_,sam,col] = clf_xgb.eval(deval)
-                            if (model_found==False) and (save_model):
-                                print "Model saved as ",model_file
-                                clf_xgb.save_model(model_file)
+                                clf_xgb = xgb.train(param, dtrain, num_round, watchlist)
+                                info3[md,eta_,gamma_,sam,col] = clf_xgb.eval(deval)
         if early_stop>0:
             score3 = np.array(info3.values())
         else:
@@ -845,14 +833,8 @@ def do_xgb(filename='BDT_1_1_V6.txt',search=False, logfile=None, max_depth=15, e
             out_df.columns=['max_depth', 'eta', 'gamma', 'subsample', 'colsample_bytree', 'best_iteration', 'best_score']
             out_df.to_csv(logfile, index=False)
         return info3, score3
-
     param = {'max_depth':max_depth, 'eta':eta,'eval_metric':'auc', 'silent':1, 'objective':'binary:logistic', 'gamma':gamma, 'subsample':subsample, 'colsample_bytree':colsample_bytree}
-    if (load_model and os.path.exists(model_file)):
-        clf_xgb = xgb.Booster() #init model
-        clf_xgb.load_model(model_file) # load data
-        model_found = True
-        print "Model found, loading file ",model_file
-    elif early_stop>0:
+    if early_stop>0:
         clf_xgb = xgb.train(param, dtrain, num_round, watchlist, early_stopping_rounds=early_stop)
     else:
         clf_xgb = xgb.train(param, dtrain, num_round, watchlist)
@@ -862,6 +844,13 @@ def do_xgb(filename='BDT_1_1_V6.txt',search=False, logfile=None, max_depth=15, e
         dtest = xgb.DMatrix(_x)
         preds = bst.predict(dtest)
     return clf_xgb
+
+def do_xgb(filename='BDT_1_1_V6.txt',search=False, logfile=None, max_depth=15, eta=0.04, gamma=5,
+           subsample=0.6, colsample_bytree=0.7, num_round=200, predict_file=None,
+           early_stop=0, test_ratio=0.1, fit_transform='empirical_scale',
+           save_model=True, load_model=True):
+    x,y,_ = read_data(filename=filename, fit_transform=fit_transform)
+    return do_xgb_xy(x,y, search=search, logfile=logfile, max_depth=max_depth, eta=eta, gamma=gamma, subsample=subsample, colsample_bytree=colsample_bytree, num_round=num_round, predict_file=predict_file, early_stop=early_stop, test_ratio=test_ratio, fit_transform=fit_transform, save_model=save_model, load_model=load_model)
 
 def calcLiMa(non, noff, alpha):
     return np.sqrt(2*(non*np.log((1.+alpha)/alpha*(non/(non+noff)))+noff*np.log((1.+alpha)*(noff/(non+noff)))))
