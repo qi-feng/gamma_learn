@@ -450,10 +450,16 @@ class PyVMSCWData:
                 # !!!! adopting the usual 1 is signal........
                 self.EventsDF.IsGamma.values[np.where((self.E_bins==E) & (self.Z_bins==Z))] = ((predict_y*2-1)>self.cuts[E][Z]).astype(np.float)
 
-    def write_RFtree(self, runNum=None):
+    def write_RFtree(self, runNum=None, using_box_cuts=False, 
+        MSCW_cuts=[-2.,2.], MSCL_cuts=[-2., 5.], theta2_cuts=[-1, 0.008], 
+        log10_SizeSecondMax_cuts=[2.7781, 30.], arraycore_cuts=[-1., 350.], 
+        emissionheight_cuts=[6., 1.e12], filename_keyword=None):
         if runNum==None:
             runNum=self.filename.split('/')[-1].split('.')[0]
-        newfile = str(runNum)+".mscw.rf.root"
+        if filename_keyword==None:
+            newfile = str(runNum)+".mscw.rf.root"
+        else:
+            newfile = str(runNum)+str(filename_keyword)+".mscw.rf.root"
         print "Creating a root file "+str(newfile)+"."
         self.xgbfile = ROOT.TFile(newfile, "RECREATE");
         # Create rf struct
@@ -485,7 +491,23 @@ class PyVMSCWData:
             rf.eventNumber = self.EventsDF.eventNumber.values[i]
             rf.icut = 1
             rf.Ng = 1
-            rf.g[0] =  self.EventsDF.IsGamma.values[i]
+            # if using box cuts:
+            if using_box_cuts:
+                if (self.EventsDF.MSCW[i] >= MSCW_cuts[0]) and \
+                   (self.EventsDF.MSCW[i] <= MSCW_cuts[1]) and \
+                   (self.EventsDF.MSCL[i] >= MSCL_cuts[0]) and \
+                   (self.EventsDF.MSCL[i] <= MSCL_cuts[1]) and \
+                   (self.EventsDF.log10_SizeSecondMax_[i] >= log10_SizeSecondMax_cuts[0]) and \
+                   (self.EventsDF.log10_SizeSecondMax_[i] <= log10_SizeSecondMax_cuts[1]) and \
+                   (self.EventsDF.sqrt_Xcore_T_Xcore_P_Ycore_T_Ycore_[i] >= arraycore_cuts[0]) and \
+                   (self.EventsDF.sqrt_Xcore_T_Xcore_P_Ycore_T_Ycore_[i] <= arraycore_cuts[1]) and \
+                   (self.EventsDF.EmissionHeight[i] >= emissionheight_cuts[0]) and \
+                   (self.EventsDF.EmissionHeight[i] <= emissionheight_cuts[1]):
+                    rf.g[0] = 1
+                else:
+                    rf.g[0] = 0
+            else:
+                rf.g[0] =  self.EventsDF.IsGamma.values[i]
             rfTree.Fill()
         #data_on.AutoSave()
         #data_on.Write()
