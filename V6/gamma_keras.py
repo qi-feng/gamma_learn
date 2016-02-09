@@ -81,16 +81,20 @@ def search_keras(filename="BDT_2_0_V6.txt", fit_transform='linear', test_size=0.
     params=[]
     print("Reading data from file %s ..." % filename)
     train_x, train_y, test_x, test_y = read_data_keras(filename=filename, fit_transform=fit_transform, test_size=test_size)
-    for layer_d, drop_, nb_epoch_, batch_ in zip(l_list, d_list, e_list, b_list):
-        modelname='keras_'+filename[4:7]+'_V6_3layers_'+str(layer_d[0])+'_'+str(layer_d[1])+'_'+str(layer_d[2])+'_dropouts_'+str(drop_[0])+'_'+str(drop_[1])+'_'+str(drop_[2])+'_epoch'+str(nb_epoch_)+'batch'+str(batch_)+'.pkl'
-        model, obj_score, auc_score = do_keras(train_x, train_y, test_x, test_y, layers=[Dense, Dense, Dense], layer_dims=layer_d, activations=['relu', 'relu', 'relu'], dropouts=drop_, loss='binary_crossentropy', optimizer="rmsprop", out_activation='sigmoid', init='glorot_uniform', nb_epoch=nb_epoch_, batch_size=batch_, valid_ratio=0.15, dump=dump, overwrite=overwrite, modelname=modelname)
-        params.append([layer_d, drop_, nb_epoch_, batch_])
-        scores.append(obj_score)
-        aucs.append(auc_score)
-        print "model trained: "
-        print "params: ", [layer_d, drop_, nb_epoch_, batch_]
-        print "objective score: ", obj_score
-        print "auc score: ", auc_score
+    #for layer_d, drop_, nb_epoch_, batch_ in zip(l_list, d_list, e_list, b_list):
+    for layer_d in l_list: 
+      for drop_ in d_list:
+        for nb_epoch_ in e_list:
+          for batch_ in b_list:
+            modelname='keras_'+filename[4:7]+'_V6_3layers_'+str(layer_d[0])+'_'+str(layer_d[1])+'_'+str(layer_d[2])+'_dropouts_'+str(drop_[0])+'_'+str(drop_[1])+'_'+str(drop_[2])+'_epoch'+str(nb_epoch_)+'batch'+str(batch_)+'.pkl'
+            model, obj_score, auc_score = do_keras(train_x, train_y, test_x, test_y, layers=[Dense, Dense, Dense], layer_dims=layer_d, activations=['relu', 'relu', 'relu'], dropouts=drop_, loss='binary_crossentropy', optimizer="rmsprop", out_activation='sigmoid', init='glorot_uniform', nb_epoch=nb_epoch_, batch_size=batch_, valid_ratio=0.15, dump=dump, overwrite=overwrite, modelname=modelname)
+            params.append([layer_d, drop_, nb_epoch_, batch_])
+            scores.append(obj_score)
+            aucs.append(auc_score)
+            print "model trained: "
+            print "params: ", [layer_d, drop_, nb_epoch_, batch_]
+            print "objective score: ", obj_score
+            print "auc score: ", auc_score
     print params, scores, aucs
     return params, scores, aucs
 
