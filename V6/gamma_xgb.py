@@ -15,13 +15,6 @@ from sklearn.metrics import log_loss
 from scipy.optimize import minimize
 import os
 
-from lasagne.layers import DenseLayer
-from lasagne.layers import InputLayer
-from lasagne.layers import DropoutLayer
-from lasagne.nonlinearities import identity
-from lasagne.nonlinearities import softmax
-from lasagne.updates import nesterov_momentum
-from nolearn.lasagne import NeuralNet
 from sklearn.cross_validation import StratifiedShuffleSplit
 from sklearn.calibration import CalibratedClassifierCV
 import xgboost as xgb
@@ -125,7 +118,7 @@ class PyVAnaSumData:
         self.BDT_Elevation = self.OnEvts.Elevation
         self.E_bins=np.digitize(self.BDT_ErecS, self.E_grid)-1
         self.Z_bins=np.digitize((90.-self.BDT_Elevation), self.Zen_grid)-1
-    def predict_BDT_on(self, modelpath='.', modelbase='BDT', modelext='.model', scaler=None,fit_transform='empirical_scale'):
+    def predict_BDT_on(self, modelpath='.', modelbase='BDT', modelext='.model', scaler=None,fit_transform=None):
         if not hasattr(self, 'OnEvts'):
             print "No data frame for on events found, running self.get_data_on() now!"
             self.get_data_on()
@@ -230,7 +223,7 @@ class PyVAnaSumData:
         self.BDT_Elevation_off = self.OffEvts.Elevation
         self.E_bins_off=np.digitize(self.BDT_ErecS_off, self.E_grid)-1
         self.Z_bins_off=np.digitize((90.-self.BDT_Elevation_off), self.Zen_grid)-1
-    def predict_BDT_off(self, modelpath='.', modelbase='BDT', modelext='.model', scaler=None,fit_transform='empirical_scale'):
+    def predict_BDT_off(self, modelpath='.', modelbase='BDT', modelext='.model', scaler=None,fit_transform=None):
         if not hasattr(self, 'OffEvts'):
             print "No data frame for off events found, running self.get_data_off() now!"
             self.get_data_off()
@@ -323,10 +316,17 @@ class PyVMSCWData:
         #                    [0.974992, 0.9178,   0.980435, 0.966418],
         #                    [0.942434, 0.930608, 0.946548, 0.929107]])
         # cuts based on tpr > 0.995:
-        self.cuts=np.array([[-0.92426705, -0.91551454, -0.90352066, -0.7667466 ],
-                            [-0.92712007, -0.92634553, -0.93168149, -0.90905616],
-                            [-0.93170046, -0.84021266, -0.92142534, -0.84285684],
-                            [-0.88808747, -0.87293372, -0.86932586, -0.84854317]])
+        #self.cuts=np.array([[-0.92426705, -0.91551454, -0.90352066, -0.7667466 ],
+        #                    [-0.92712007, -0.92634553, -0.93168149, -0.90905616],
+        #                    [-0.93170046, -0.84021266, -0.92142534, -0.84285684],
+        #                    [-0.88808747, -0.87293372, -0.86932586, -0.84854317]])
+
+        # Threshold tpr>=0.991 is  
+        self.cuts=np.array([[-0.88113882,-0.87138152,-0.85791917,-0.68331775],
+                    [-0.88134708, -0.87677245, -0.88194321, -0.86946824],
+                    [-0.89294261, -0.76332261, -0.87405273, -0.76032431],
+                    [-0.81363574, -0.79611133, -0.7890992 , -0.74999782]])
+
 
 
         if filename:
@@ -413,7 +413,7 @@ class PyVMSCWData:
         #                    [-0.04491699,0.69762886,0.0508287,0.28274822],
         #                    [0.20882559,-0.42245674,0.35600829,-0.28852916],
         #                    [-0.29889989,-0.36590242,-0.26210219,-0.30039829]])
-    def predict_BDT(self, modelpath='.', modelbase='BDT', modelext='.model', scaler=None,fit_transform='empirical_scale'):
+    def predict_BDT(self, modelpath='.', modelbase='BDT', modelext='.model', scaler=None,fit_transform=None):
         if not hasattr(self, 'EventsDF'):
             print "No data frame for on events found, running self.get_data() now!"
             self.get_data()
@@ -574,7 +574,7 @@ class PyVBDTData:
         else:
             if not hasattr(self, 'TrainTree'):
                 self.TrainTree=df_
-    def make_features(self, test=False, fit_transform='empirical_scale', scaler=None):
+    def make_features(self, test=False, fit_transform=None, scaler=None):
         if test:
             if not hasattr(self, 'TestTree'):
                 print "No TestTree found, running self.get_tree() now!"
@@ -614,7 +614,7 @@ class PyVBDTData:
                max_depth=15, eta=0.04, gamma=5, subsample=0.6,colsample_bytree=0.7,
                num_round=500, predict_file=None, early_stop=50, test_ratio=0.2):
         if not hasattr(self, 'train_x'):
-            self.make_features(test=False, fit_transform='empirical_scale', scaler=None)
+            self.make_features(test=False, fit_transform=None, scaler=None)
         sss = StratifiedShuffleSplit(self.train_y, test_size=test_ratio, random_state=1234)
         for train_index, test_index in sss:
             break
@@ -672,7 +672,7 @@ class PyVBDTData:
             if dump_raw:
                 self.clf_xgb.dump_model(outfile+'dump.raw.txt')
 
-def read_data(filename='BDT_1_1.txt', predict=False, scaler=None, fit_transform='empirical_scale'):
+def read_data(filename='BDT_1_1.txt', predict=False, scaler=None, fit_transform=None):
     if predict==True:
         print "Read data for prediction..."
         x = pd.read_csv(filename)
@@ -777,7 +777,7 @@ def compare_sig_bkg(x, y, columns=None, save_eps=None):
         plt.savefig(save_eps, format='eps', dpi=500)
     return fig, plt
 
-def read_ED_anasum_data(filename='test_Crab_V6_ED_RE.txt', scaler=None, fit_transform='empirical_scale'):
+def read_ED_anasum_data(filename='test_Crab_V6_ED_RE.txt', scaler=None, fit_transform=None):
     print "Reading EventDisplay anasum data..."
     data = pd.read_csv(filename, header=None, sep=r"\s+")
     data.columns=['runNum','evtNum','MSCW','MSCL','log10_EChi2S_','EmissionHeight',
@@ -800,7 +800,7 @@ def read_ED_anasum_data(filename='test_Crab_V6_ED_RE.txt', scaler=None, fit_tran
     y = y.values.astype(np.int32)
     return x, y, scaler
 
-def read_data_xgb(filename='BDT_1_1.txt', predict=False, cv_ratio=0.1, scaler=None, fit_transform='empirical_scale', random_state=1234):
+def read_data_xgb(filename='BDT_1_1.txt', predict=False, cv_ratio=0.1, scaler=None, fit_transform=None, random_state=1234):
     if predict:
         x, y, _ = read_data(filename=filename, predict=False, scaler=scaler, fit_transform=fit_transform)
         dtestx = xgb.DMatrix(x)
@@ -869,7 +869,7 @@ def do_xgb_xy(x, y,search=False, logfile=None, max_depth=15, eta=0.04, gamma=5,
 
 def do_xgb(filename='BDT_1_1_V6.txt',search=False, logfile=None, max_depth=15, eta=0.04, gamma=5,
            subsample=0.6, colsample_bytree=0.7, num_round=200, predict_file=None,
-           early_stop=0, test_ratio=0.1, fit_transform='empirical_scale',
+           early_stop=0, test_ratio=0.1, fit_transform=None,
            save_model=True, load_model=True):
     x,y,_ = read_data(filename=filename, fit_transform=fit_transform)
     return do_xgb_xy(x,y, search=search, logfile=logfile, max_depth=max_depth, eta=eta, gamma=gamma, subsample=subsample, colsample_bytree=colsample_bytree, num_round=num_round, predict_file=predict_file, early_stop=early_stop, test_ratio=test_ratio, fit_transform=fit_transform, save_model=save_model, load_model=load_model)
@@ -997,9 +997,9 @@ def plot_all_xgb_models(thresh_IsGamma=0.99):
                                                                   outfile="BDT_"+str(i)+'_'+str(j)+"_xgb_thresh"+str(thresh_IsGamma),
                                                                   nbins=40, plot_roc=True, plot_tmva_roc=True,
                                                                   norm_hist=True, thresh_IsGamma=thresh_IsGamma)
-    print "Threshold tpr>="+str(thresh_IsGamma)+" is ", thresh_tpr
-    print "Threshold fpr<="+str(1-thresh_IsGamma)+" is ", thresh_fpr
-    print "Threshold max diff between tpr and fpr is ", thresh_maxdiff
+    print "Threshold tpr>="+str(thresh_IsGamma)+" is ", repr(thresh_tpr)
+    print "Threshold fpr<="+str(1-thresh_IsGamma)+" is ", repr(thresh_fpr)
+    print "Threshold max diff between tpr and fpr is ", repr(thresh_maxdiff)
 
 
 if __name__ == '__main__':
