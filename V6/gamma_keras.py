@@ -33,7 +33,7 @@ def do_keras_file(filename="BDT_2_0_V6.txt", fit_transform='linear', test_size=0
     modelname='keras_'+filename[4:7]+'_V6_3layers_'+str(layer_dims[0])+'_'+str(layer_dims[1])+'_'+str(layer_dims[2])+'_dropouts_'+str(dropouts[0])+'_'+str(dropouts[1])+'_'+str(dropouts[2])+'_epoch'+str(nb_epoch)+'batch'+str(batch_size)+'.pkl'
     return do_keras(train_x, train_y, test_x, test_y, layers=layers, layer_dims=layer_dims, activations=activations, dropouts=dropouts, loss=loss, optimizer=optimizer, out_activation=out_activation, init=init, nb_epoch=nb_epoch, batch_size=batch_size, valid_ratio=valid_ratio, dump=dump, overwrite=overwrite, modelname=modelname)
 
-def do_keras(train_x, train_y, test_x, test_y, layers=[Dense, Dense, Dense], layer_dims=[512, 512, 1024], activations=['relu', 'relu', 'relu'], dropouts=[0.5, 0.5, 0.5], loss='binary_crossentropy', optimizer="rmsprop", out_activation='sigmoid', init='glorot_uniform', nb_epoch=20, batch_size=128, valid_ratio=0.15, dump=False, overwrite=False, modelname=None):
+def do_keras(train_x, train_y, test_x, test_y, layers=[Dense, Dense, Dense], layer_dims=[512, 512, 1024], activations=['relu', 'relu', 'relu'], dropouts=[0.5, 0.5, 0.5], loss='binary_crossentropy', optimizer="rmsprop", out_activation='sigmoid', init='glorot_uniform', nb_epoch=20, batch_size=128, valid_ratio=0.15, dump=False, overwrite=False, modelname=None, conv=True):
     dims = train_x.shape[1]
     n_classes = 1
     input_dim = dims
@@ -71,11 +71,11 @@ def do_keras(train_x, train_y, test_x, test_y, layers=[Dense, Dense, Dense], lay
     print 'The training AUC score is {0}, and the test AUC score is: {1}'.format(roc_auc, roc_auc_test)
     return model, objective_score, roc_auc_test
 
-def search_keras(filename="BDT_2_0_V6.txt", fit_transform='linear', test_size=0.2, dump=False, overwrite=False):
-    l_list=[[512, 512, 1024], [512, 1024, 2048], [1024, 2048, 2048]]
-    d_list=[[0.5, 0.5, 0.5], [0.6, 0.6, 0.6], [0.4, 0.4, 0.4]]
-    e_list=[20, 40]
-    b_list=[64, 128]
+def search_keras(filename="BDT_2_0_V6.txt", fit_transform='linear', test_size=0.2, dump=False, overwrite=False, 
+        l_list=[[16, 32, 64], [16, 64, 128], [32, 128, 256], [32, 128, 512], [64, 256, 512]],
+        d_list=[[0.1, 0.2, 0.5]], 
+        e_list=[10], 
+        b_list=[128, 256]):
     scores=[]
     aucs=[]
     params=[]
