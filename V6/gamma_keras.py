@@ -50,7 +50,7 @@ def do_keras(train_x, train_y, test_x, test_y, layers=[Dense, Dense, Dense], lay
         for layer_, layer_dim_, activation_, dropouts_ in zip(layers, layer_dims, activations, dropouts):
             model.add(layer_(output_dim=layer_dim_, input_dim=input_dim, init=init, activation=activation_))
             model.add(Dropout(dropouts_))
-            model.add(BatchNormalization((layer_dim_,)))
+            #model.add(BatchNormalization((layer_dim_,)))
             input_dim = layer_dim_
         model.add(Dense(output_dim=1, input_dim=input_dim, activation=out_activation))
         model.compile(loss=loss, optimizer=optimizer)
@@ -204,7 +204,7 @@ def plot_keras_pseudo_TMVA(model_file="keras_2_0_V6_3layers_64_256_512_dropouts_
 
     return thresh_test[thresh_index_tpr]*2-1, thresh_test[thresh_index_fpr]*2-1, thresh_maxdiff
 
-def pred_4_models(E=2, Z=0, weights=None):
+def pred_4_models(E=2, Z=0, weights=None, thresh_IsGamma=0.9):
     model_x_file="BDT"+str(E)+str(Z)+".model"
     model_k_file="keras_"+str(E)+"_"+str(Z)+"_V6_3layers_64_256_512_dropouts_0.1_0.2_0.5_epoch10batch128.pkl"
     model_xLT_file="BDT"+str(E)+str(Z)+"LT.model"
@@ -217,8 +217,8 @@ def pred_4_models(E=2, Z=0, weights=None):
     print "Predicting xgb non trans"
     clfx = xgb.Booster() #init model
     clfx.load_model(model_x_file) # load data
-    trainx_x, trainx_y =read_data_xgb(train_file, predict=True)
-    testx_x, testx_y =read_data_xgb(test_file, predict=True)
+    trainx_x, trainx_y =read_data_xgb(train_file, predict=True, fit_transform=None)
+    testx_x, testx_y =read_data_xgb(test_file, predict=True, fit_transform=None)
     predict_trainx_y = clfx.predict(trainx_x)
     predict_testx_y = clfx.predict(testx_x)
     del trainx_x
@@ -298,7 +298,8 @@ def pred_4_models(E=2, Z=0, weights=None):
     #        raise
     #else:
         #weights=optimize_weights([predict_trainx_y, predict_traink_y], traink_y)
-    weights=optimize_weights([predict_trainx_y, predict_trainx1_y, predict_trainx2_y, predict_traink_y, predict_trainrf_y], traink_y)
+    if weights == None:
+        weights=optimize_weights([predict_trainx_y, predict_trainx1_y, predict_trainx2_y, predict_traink_y, predict_trainrf_y], traink_y)
     wts_test=optimize_weights([predict_testx_y, predict_testx1_y, predict_testx2_y, predict_testk_y, predict_testrf_y], testk_y)
 
     #assert len(weights)==5, "Weights provided are longer than 5"
@@ -314,7 +315,21 @@ def pred_4_models(E=2, Z=0, weights=None):
     print 'The combined training AUC score is {0}, and the test AUC score is: {1}'.format(roc_auc, roc_auc_test)
     #print 'The combined training AUC score is {0}'.format(roc_auc)
 
-    return weights, wts_test
+    diff_tpr_fpr=tpr_test-fpr_test
+    thresh_index_fpr = np.argmin(fpr_test<=(1-thresh_IsGamma))
+    thresh_index_tpr = np.argmax(tpr_test>=thresh_IsGamma)
+    thresh_index2 = np.where(diff_tpr_fpr==np.max(diff_tpr_fpr))
+    print "Note that below TMVA threshold [-1, 1] is used instead of probability"
+    print "However, note that thresh_IsGamma should be given in probability"
+    print "Threshold tpr>="+str(thresh_IsGamma)+" is "+str(thresh_test[thresh_index_tpr]*2-1)
+    print "Threshold fpr<="+str(1-thresh_IsGamma)+" is "+str(thresh_test[thresh_index_fpr]*2-1)
+    print "Threshold index found ", thresh_index2
+    for ind_ in thresh_index2:
+        for ind in ind_:
+            print "TMVA Threshold max diff", thresh_test[ind]*2-1
+            thresh_maxdiff = thresh_test[ind]*2-1
+
+    return weights, wts_test, thresh_test[thresh_index_tpr]*2-1, thresh_test[thresh_index_fpr]*2-1, thresh_maxdiff
 
 def plot_2models_pseudo_TMVA(model_x_file="BDT20.model", model_k_file="keras_2_0_V6_3layers_64_256_512_dropouts_0.1_0.2_0.5_epoch10batch128.pkl", train_file="BDT_2_0_V6.txt", test_file="BDT_2_0_Test_V6.txt",
         ifKDE=False, outfile='BDT_2_0_combined', nbins=40, plot_roc=True, plot_tmva_roc=True, norm_hist=True, thresh_IsGamma=0.95, weights=None):
@@ -470,16 +485,18 @@ def log_loss_func(weights, predictions=[], y=np.ones(1)):
             final_prediction += weight*prediction
     return log_loss(y, final_prediction)
 
-def auc_func(weights, predictions=[], y=np.ones(1)):
+#def auc_func(weights, predictions=[], y=np.ones(1)):
+def auc_func(weights, predictions, y):
     ''' scipy minimize will pass the weights as a numpy array 
         note the negative sign for minimize
     '''
-    final_prediction = 0
+    final_prediction = np.zeros(len(predictions[0]))
     for weight, prediction in zip(weights, predictions):
             final_prediction += weight*prediction
-    fpr, tpr, thresh = roc_curve(y,final_prediction)
-    return -auc(fpr, tpr)
-
+    #fpr, tpr, thresh = roc_curve(y,final_prediction)
+    #print final_prediction
+    #return -auc(fpr, tpr)
+    return -roc_auc_score(y,final_prediction)
 
 def optimize_weights(predictions, y):
     #predictions = []
@@ -494,7 +511,7 @@ def optimize_weights(predictions, y):
     bounds = [(0,1)]*len(predictions)
     
     #res = minimize(log_loss_func, starting_values, method='SLSQP', bounds=bounds, constraints=cons)
-    res = minimize(auc_func, starting_values, args=(predictions, y,), method='SLSQP', bounds=bounds, constraints=cons)
+    res = minimize(auc_func, starting_values, args=(predictions, y,), method='SLSQP', bounds=bounds, constraints=cons, options={'eps': 1.e-3})
     print('Ensamble Score: {best_score}'.format(best_score=res['fun']))
     print('Best Weights: {weights}'.format(weights=res['x']))
     return res['x']

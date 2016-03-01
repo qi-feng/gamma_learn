@@ -407,8 +407,8 @@ class PyVMSCWData:
         self.E_bins=np.digitize(self.BDT_ErecS, self.E_grid)-1
         self.Z_bins=np.digitize((90.-self.BDT_Elevation), self.Zen_grid)-1
 
-    def read_cuts(self, cutsfile):
-        self.cutsfile=cutsfile
+    def read_cuts(self, cutsarray):
+        self.cuts=cutsarray
         #self.cuts=np.array([[0.01841879,0.05553091,0.02724016,-0.35556817],
         #                    [-0.04491699,0.69762886,0.0508287,0.28274822],
         #                    [0.20882559,-0.42245674,0.35600829,-0.28852916],
