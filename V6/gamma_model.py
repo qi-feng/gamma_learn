@@ -15,16 +15,27 @@ from sklearn.metrics import log_loss
 from scipy.optimize import minimize
 import os
 
-from lasagne.layers import DenseLayer
-from lasagne.layers import InputLayer
-from lasagne.layers import DropoutLayer
-from lasagne.nonlinearities import identity
-from lasagne.nonlinearities import softmax
-from lasagne.updates import nesterov_momentum
-from nolearn.lasagne import NeuralNet
+#from lasagne.layers import DenseLayer
+#from lasagne.layers import InputLayer
+#from lasagne.layers import DropoutLayer
+#from lasagne.nonlinearities import identity
+#from lasagne.nonlinearities import softmax
+#from lasagne.updates import nesterov_momentum
+#from nolearn.lasagne import NeuralNet
 from sklearn.cross_validation import StratifiedShuffleSplit
 from sklearn.calibration import CalibratedClassifierCV
 import xgboost as xgb
+
+from keras.models import Sequential
+from keras.layers.core import Dense, Dropout, Activation
+from keras.optimizers import SGD
+from keras.layers.normalization import BatchNormalization
+from keras.layers.advanced_activations import PReLU
+from keras.utils import np_utils, generic_utils
+import numexpr as ne
+import cPickle as pickle
+import sys
+sys.setrecursionlimit(5000)
 
 from sklearn.metrics import roc_auc_score, roc_curve, auc
 import seaborn as sns
@@ -96,6 +107,7 @@ class PyVAnaSumData:
                 df_.MSCW[i] = event.MSCW
                 df_.MSCL[i] = event.MSCL
                 df_.ErecS[i] = event.ErecS
+                df_.EmissionHeight[i] = event.EmissionHeight
                 df_.log10_EChi2S_[i] = log10_EChi2S_
                 df_.log10_EmissionHeightChi2_[i] = log10_EmissionHeightChi2_
                 df_.log10_SizeSecondMax_[i] = log10_SizeSecondMax_
@@ -199,6 +211,7 @@ class PyVAnaSumData:
                 df_.MSCL[i] = event.MSCL
                 df_.ErecS[i] = event.ErecS
                 df_.log10_EChi2S_[i] = log10_EChi2S_
+                df_.EmissionHeight[i] = event.EmissionHeight
                 df_.log10_EmissionHeightChi2_[i] = log10_EmissionHeightChi2_
                 df_.log10_SizeSecondMax_[i] = log10_SizeSecondMax_
                 df_.sqrt_Xcore_T_Xcore_P_Ycore_T_Ycore_[i] = sqrt_Xcore_T_Xcore_P_Ycore_T_Ycore_
@@ -340,6 +353,7 @@ class PyVMSCWData:
             df_.MSCL[i] = event.MSCL
             df_.ErecS[i] = event.ErecS
             df_.log10_EChi2S_[i] = log10_EChi2S_
+            df_.EmissionHeight[i] = event.EmissionHeight
             df_.log10_EmissionHeightChi2_[i] = log10_EmissionHeightChi2_
             df_.log10_SizeSecondMax_[i] = log10_SizeSecondMax_
             df_.sqrt_Xcore_T_Xcore_P_Ycore_T_Ycore_[i] = sqrt_Xcore_T_Xcore_P_Ycore_T_Ycore_
@@ -374,6 +388,63 @@ class PyVMSCWData:
         #                    [-0.04491699,0.69762886,0.0508287,0.28274822],
         #                    [0.20882559,-0.42245674,0.35600829,-0.28852916],
         #                    [-0.29889989,-0.36590242,-0.26210219,-0.30039829]])
+    
+    def predict_5models(self, modelpath='.', scaler=None):
+        self.wts=np.ones((4,4,5))*0.2
+        #self.wts[0][0]=np.array([3.04173356e-01,   2.32957216e-01,   2.57095912e-01,   2.05773516e-01, -9.69957072e-17])
+        #self.wts[1][0]=np.array([0.2,0.2,0.2,0.2,0.2])
+        #self.wts[2][0]=np.array([
+        #self.wts[3][0]=np.array([0.2,0.2,0.2,0.2,0.2])
+        
+        if not hasattr(self, 'EventsDF'):
+            print "No data frame for on events found, running self.get_data() now!"
+            self.get_data()
+        if not scaler:
+            print "Warning: scaler not provided for prediction data!"
+            scaler = StandardScaler()
+        self.LTfeature = scaler.fit_transform(self.BDT).astype(np.float32)
+        self.NTfeature = self.BDT.values.astype(np.float32)
+        for E in [0,1,2,3]:
+            for Z in np.unique(self.Z_bins):
+                predict_xNT = self.NTfeature[np.where((self.E_bins==E) & (self.Z_bins==Z))]
+                predict_xLT = self.LTfeature[np.where((self.E_bins==E) & (self.Z_bins==Z))]
+                model_x_file=modelpath+str('/')+"BDT"+str(E)+str(Z)+".model"
+                model_k_file=modelpath+str('/')+"keras_"+str(E)+"_"+str(Z)+"_V6_3layers_64_256_512_dropouts_0.1_0.2_0.5_epoch10batch128.pkl"
+                model_xLT_file=modelpath+str('/')+"BDT"+str(E)+str(Z)+"LT.model"
+                model_xLT2_file=modelpath+str('/')+"BDT"+str(E)+str(Z)+"LT2.model"
+                model_rf_file=modelpath+str('/')+"RF"+str(E)+str(Z)+".pkl"
+                print "Loading model xgb non-transformed"
+                clfx = xgb.Booster() #init model
+                clfx.load_model(model_x_file) # load data
+                print "Loading model xgb linear transformed 1"
+                clfx1 = xgb.Booster() #init model
+                clfx1.load_model(model_xLT_file) # load data
+                print "Loading model xgb linear transformed 2"
+                clfx2 = xgb.Booster() #init model
+                clfx2.load_model(model_xLT2_file) # load data
+                print "Loading model keras"
+                f_in = file(model_k_file, 'rb')
+                clfk = pickle.load(f_in)
+                f_in.close()
+                print "Loading model rf"
+                f_in = file(model_rf_file, 'rb')
+                clf_rf_isotonic = pickle.load(f_in)
+                f_in.close()
+
+                predict_y = clfx.predict(xgb.DMatrix(predict_xNT))*self.wts[E][Z][0]
+                predict_y += clfx1.predict(xgb.DMatrix(predict_xLT))*self.wts[E][Z][1]
+                predict_y += clfx2.predict(xgb.DMatrix(predict_xLT))*self.wts[E][Z][2]
+                predict_y += clfk.predict(predict_xLT).T[0]*self.wts[E][Z][3]
+                predict_y += clf_rf_isotonic.predict_proba(predict_xLT)[:, 1]*self.wts[E][Z][4]
+                self.EventsDF.MVA.values[np.where((self.E_bins==E) & (self.Z_bins==Z))] = predict_y
+                #This is 0 for signal
+                #self.EventsDF.IsGamma.values[np.where((self.E_bins==E) & (self.Z_bins==Z))] = ((predict_y*2-1)<self.cuts[E][Z]).astype(np.float)
+                #This is 1 for signal
+                self.EventsDF.IsGamma.values[np.where((self.E_bins==E) & (self.Z_bins==Z))] = ((predict_y*2-1)>self.cuts[E][Z]).astype(np.float)
+
+
+
+
     def predict_BDT(self, modelpath='.', modelbase='BDT', modelext='.model', scaler=None,fit_transform=None):
         if not hasattr(self, 'EventsDF'):
             print "No data frame for on events found, running self.get_data() now!"
@@ -1140,7 +1211,7 @@ def roc_func(weights, predictions, test_y):
     final_prediction = 0
     for weight, prediction in zip(weights, predictions):
             final_prediction += weight*prediction
-    return roc_auc_score(test_y, final_prediction)
+    return -roc_auc_score(test_y, final_prediction)
 
 def run(train_file='train_xy2.csv', test_file='test_features2.csv', outfile='test_sub2.csv'):
     train_ratio = 0.9
