@@ -588,7 +588,7 @@ class PyVBDTData:
                 self.get_tree(test=test)
             x = np.array(self.TestTree.drop(['classID','className', 'NImages','Xoff','Yoff', 'ErecS',
                                              'weight','BDT_0'],axis=1).values)
-            y = data['classID']
+            y = 1-data['classID']
             self.test_y = y.values.astype(np.int32)
         else:
             if not hasattr(self, 'TrainTree'):
@@ -596,7 +596,7 @@ class PyVBDTData:
                 self.get_tree(test=test)
             x = np.array(self.TrainTree.drop(['classID','className', 'NImages','Xoff','Yoff', 'ErecS',
                                               'weight','BDT_0'],axis=1).values)
-            y = data['classID']
+            y = 1-data['classID']
             self.train_y = y.values.astype(np.int32)
         if scaler==None:
             scaler = StandardScaler()
@@ -711,7 +711,7 @@ def read_data(filename='BDT_1_1.txt', predict=False, scaler=None, fit_transform=
         x = scaler.fit_transform(x).astype(np.float32)
     else:
         x = x.astype(np.float32)
-    y = data['classID']
+    y = 1-data['classID']
     y = y.values.astype(np.int32)
     return x, y, scaler
 
