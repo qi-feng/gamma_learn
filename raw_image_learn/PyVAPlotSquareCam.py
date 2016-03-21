@@ -87,7 +87,7 @@ class PyVAPlotSquareCam:
         self.pos[0,0]=0.
         self.pos[0,1]=0.
 
-        plt.text(self.textOffsetX, self.textOffsetY, pixNum, size=self.pixLabelFontSize)
+        #plt.text(self.textOffsetX, self.textOffsetY, pixNum, size=self.pixLabelFontSize)
         
         #deltaX = math.sqrt(3)*self.pixSideLength/2.
         #deltaY = (3./2.*self.pixSideLength)
@@ -149,7 +149,7 @@ class PyVAPlotSquareCam:
                 skipPixel[61:68] = 1
                 skipPixel[74:77] = 1
             
-            for y in range(spiral*6-1)((numX, numX)):
+            for y in range(spiral*6-1):
                 
                 xPos += nextPixDir[y,0]*deltaX
                 yPos += nextPixDir[y,1]*deltaY
@@ -289,39 +289,45 @@ class PyVAPlotSquareCam:
         assert isinstance( rate, int ), "can only oversample at integer rate"
         self.size=np.sqrt(2.)/rate
         self.square_coordinates=np.zeros((500, 2))
+        #self.z_index=np.zeros((500, 4))
         #self.cam_radius = cam_radius
         #numX = int(cam_radius*2./size+1)
         numX = int((np.max(self.pos)-np.min(self.pos))/self.size+1*rate)
-        print numX
+        #print numX
         #self.z = np.random.rand(numX, numX)
-        self.z = np.zeros((numX, numX))
+        #self.z = np.zeros((numX, numX))
         self.z = -np.ones((numX, numX))
+        #self.zpix = np.zeros((numX, numX))
         self.x = self.pos[:,0]/np.sqrt(2.)*rate
         self.y = self.pos[:,1]/np.sqrt(2.)*rate
         self.testdf = pd.DataFrame(index=range(500), columns=['xpos', 'xind', 'ypos', 'yind'])
         #self.x = np.arange(-cam_radius, cam_radius+size, size)
         #self.y = np.arange(-cam_radius, cam_radius+size, size)
         for i_ in range(len(self.pixVals)):
-            print "Pixel ", i_, "x",  self.x[i_], (self.pos[i_,0]-np.min(self.pos))/np.sqrt(2.)*rate
-            print "y", self.y[i_], (self.pos[i_,1]-np.min(self.pos))/np.sqrt(2.)*rate
+            #print "Pixel ", i_, "x",  self.x[i_], (self.pos[i_,0]-np.min(self.pos))/np.sqrt(2.)*rate
+            #print "y", self.y[i_], (self.pos[i_,1]-np.min(self.pos))/np.sqrt(2.)*rate
             self.testdf.iloc[i_] = self.x[i_], (self.pos[i_,0]-np.min(self.pos))/np.sqrt(2.)*rate, self.y[i_], (self.pos[i_,1]-np.min(self.pos))/np.sqrt(2.)*rate
             #x_ = (self.pos[i_,0]-np.min(self.pos))/np.sqrt(2.)*2.
             #y_ = (self.pos[i_,1]-np.min(self.pos))/np.sqrt(2.)*2.
-            y_ = self.x[i_] -np.min(self.x)
-            x_ = self.y[i_] -np.min(self.y)
-            self.square_coordinates[i_, 0] = y_
-            self.square_coordinates[i_, 1] = x_
+            x_ = int(round(self.x[i_] -np.min(self.x)))
+            y_ = int(round(self.y[i_] -np.min(self.y)))
+            self.square_coordinates[i_, 0] = x_
+            self.square_coordinates[i_, 1] = y_
             self.z[x_:x_+rate, y_:y_+rate] = self.pixVals[i_]
+            #self.zpix[x_:x_+rate, y_:y_+rate] = i_
+            #self.z_index[i_, :] = [x_, x_+1, y_, y_+1]
             #self.z[x_, y_] = self.pixVals[i_]
             #for k in range(1, rate):
             #    self.z[x_, y_+k] = self.pixVals[i_]
             #    self.z[x_+k, y_] = self.pixVals[i_]
             #    self.z[x_+k, y_+k] = self.pixVals[i_]
 
-    def drawOversampled(self, cm = plt.cm.CMRmap, vmin=100, vmax=600):
-        plt.pcolor(self.z, cmap=cm, vmin=vmin, vmax=vmax)
+    def drawOversampled(self, cm = plt.cm.CMRmap, vmin=100, vmax=600, xmin=0, xmax = 54):
+        plt.pcolor(self.z.T, cmap=cm, vmin=vmin, vmax=vmax)
         for pixNum in range(499):
-            plt.text(self.square_coordinates[pixNum,0], self.square_coordinates[pixNum, 1], pixNum, size=self.pixLabelFontSize)
+            plt.text(int(self.square_coordinates[pixNum,0]), int(self.square_coordinates[pixNum, 1]), pixNum, size=self.pixLabelFontSize)
+        plt.xlim(xmin, xmax)
+        plt.ylim(xmin, xmax)
         plt.show()
 
 
