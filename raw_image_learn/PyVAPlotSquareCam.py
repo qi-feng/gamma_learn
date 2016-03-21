@@ -359,7 +359,7 @@ class PyVAPlotSquareCam:
             print i_, val_, self.pos[i_,0], self.pos[i_,1]
             self.GaussianKernel(x=self.pos[i_,0], y=self.pos[i_,1], val=val_, size=size, stddev=stddev)
 
-    def plotZ(self, cm=plt.cm.inferno, interpolation='nearest', scale=None):
+    def plotZ(self, cm=plt.cm.CMRmap, interpolation='nearest', scale=None):
         img = plt.imshow(self.z, extent=(self.x.min(), self.x.max(), self.y.min(), self.y.max()),interpolation=interpolation, cmap=cm)
         plt.colorbar(img, cmap=cm, boundaries=scale)
         if scale:
