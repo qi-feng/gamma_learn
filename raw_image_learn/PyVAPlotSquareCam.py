@@ -289,7 +289,7 @@ class PyVAPlotSquareCam:
         assert isinstance( rate, int ), "can only oversample at integer rate"
         self.size=np.sqrt(2.)/rate
         self.square_coordinates=np.zeros((500, 2))
-        #self.z_index=np.zeros((500, 4))
+        self.z_index=np.zeros((500, 4))
         #self.cam_radius = cam_radius
         #numX = int(cam_radius*2./size+1)
         numX = int((np.max(self.pos)-np.min(self.pos))/self.size+1*rate)
@@ -315,7 +315,7 @@ class PyVAPlotSquareCam:
             self.square_coordinates[i_, 1] = y_
             self.z[x_:x_+rate, y_:y_+rate] = self.pixVals[i_]
             #self.zpix[x_:x_+rate, y_:y_+rate] = i_
-            #self.z_index[i_, :] = [x_, x_+1, y_, y_+1]
+            self.z_index[i_, :] = [x_, x_+1, y_, y_+1]
             #self.z[x_, y_] = self.pixVals[i_]
             #for k in range(1, rate):
             #    self.z[x_, y_+k] = self.pixVals[i_]
@@ -328,6 +328,7 @@ class PyVAPlotSquareCam:
             plt.text(int(self.square_coordinates[pixNum,0]), int(self.square_coordinates[pixNum, 1]), pixNum, size=self.pixLabelFontSize)
         plt.xlim(xmin, xmax)
         plt.ylim(xmin, xmax)
+        plt.colorbar()
         plt.show()
 
 
@@ -378,4 +379,14 @@ class PyVAPlotSquareCam:
         for y in self.y:
             plt.plot([self.x[0], self.x[-1]], [y, y], color='black', alpha=.33, linestyle=':')
         #plt.show()
+
+
+def quick_oversample2(pixVals, z_index, numX=54):
+    z = -np.ones((numX, numX))
+    for i_ in range(len(pixVals)):
+        x_ = int(z_index.at[i_, 'x1'])
+        y_ = int(z_index.at[i_,'y1'])
+        z[x_:x_+1, y_:y_+1] = pixVals[i_]
+    return z
+
 
