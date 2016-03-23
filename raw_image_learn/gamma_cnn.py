@@ -9,6 +9,7 @@ from keras.optimizers import SGD
 #from keras.layers.advanced_activations import PReLU
 #from keras.utils import np_utils, generic_utils
 from sklearn.metrics import roc_auc_score, roc_curve, auc
+from get_raw_features import *
 
 def do_cnn(train_x, train_y, test_x, test_y, input_shape=(4, 54, 54), filter_n1=64, filter_size1=6,
            filter_n2=64, filter_size2=6, pool_size1=3, pool_size2=2, filter_drop1=0.25, filter_drop2=0.25,
@@ -55,7 +56,7 @@ def do_cnn(train_x, train_y, test_x, test_y, input_shape=(4, 54, 54), filter_n1=
     m_history = model.fit(train_x, train_y, batch_size=batch_size, nb_epoch=nb_epoch)
 
     objective_score = model.evaluate(test_x, test_y, batch_size=batch_size)
-    print objective_score
+    print "The objective score on test data is", objective_score
 
 
     predict_train_y = model.predict(train_x)
@@ -67,4 +68,30 @@ def do_cnn(train_x, train_y, test_x, test_y, input_shape=(4, 54, 54), filter_n1=
     print 'The training AUC score is {0}, and the test AUC score is: {1}'.format(roc_auc, roc_auc_test)
 
     return model, m_history
+
+def read_data_from_pickle(fs=["64080_raw_trainx.pkl", "64080_raw_trainy.pkl", "64080_raw_testx.pkl", "64080_raw_testy.pkl"]):
+    train_x = load_pickle(fs[0])
+    train_y = load_pickle(fs[1])
+    test_x =  load_pickle(fs[2])
+    test_y =  load_pickle(fs[3])
+    return train_x, train_y, test_x, test_y
+
+def read_all_data_from_pickle(runs=[64080, 64081, 64082, 64083]):
+    train_x, train_y, test_x, test_y = read_data_from_pickle(fs=[str(runs[0])+"_raw_trainx.pkl", str(runs[0])+"_raw_trainy.pkl",
+                                                                     str(runs[0])+"_raw_testx.pkl", str(runs[0])+"_raw_testy.pkl"])
+    for run in runs[1:]:
+        train_x_, train_y_, test_x_, test_y_  = read_data_from_pickle(fs=[str(run)+"_raw_trainx.pkl", str(run)+"_raw_trainy.pkl",
+                                                                     str(run)+"_raw_testx.pkl", str(run)+"_raw_testy.pkl"])
+        train_x = np.concatenate((train_x, train_x_), axis=0)
+        train_y = np.concatenate((train_y, train_y_), axis=0)
+        test_x = np.concatenate((test_x, test_x_), axis=0)
+        test_y = np.concatenate((test_y, test_y_), axis=0)
+    return train_x, train_y, test_x, test_y
+
+def concat_data(train_x1, train_y1, test_x1, test_y1, train_x2, train_y2, test_x2, test_y2):
+    train_x = np.concatenate((train_x1, train_x2), axis=0)
+    train_y = np.concatenate((train_y1, train_y2), axis=0)
+    test_x = np.concatenate((test_x1, test_x2), axis=0)
+    test_y = np.concatenate((test_y1, test_y2), axis=0)
+    return train_x, train_y, test_x, test_y
 
