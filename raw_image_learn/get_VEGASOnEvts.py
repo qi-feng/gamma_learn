@@ -32,7 +32,7 @@ def getVEGASonOneRun(f, runnum=72045, thetasq=0.01):
     return train_x1, train_y1, test_x1, test_y1
 
 def getVEGASon(f, runs, thetasq=0.01):
-    for i, run in enumerate(runs):
+    for i, runnum in enumerate(runs):
         if i==0:
             train_x, train_y, test_x, test_y = get_raw_features_on(infile=str(runnum)+'.txt',
                     in_pickle_onfile = 'on'+str(runnum)+'.pkl', test_ratio=0.3, random_state=1234,
