@@ -24,7 +24,7 @@ def getVEGASonEvtNum(f, runnum=72045, thetasq=0.01):
 
 
 def getVEGASonOneRun(f, runnum=72045, thetasq=0.01):
-    getVEGASonEvtNum(f, runnum=72045, thetasq=thetasq)
+    getVEGASonEvtNum(f, runnum=runnum, thetasq=thetasq)
     train_x1, train_y1, test_x1, test_y1 = get_raw_features_on(infile=str(runnum)+'.txt',
                     in_pickle_onfile = 'on'+str(runnum)+'.pkl', test_ratio=0.3, random_state=1234,
                     dump=False, out_trainx=str(runnum)+'_raw_trainx_on.pkl', out_trainy=str(runnum)+'_raw_trainy_on.pkl',
