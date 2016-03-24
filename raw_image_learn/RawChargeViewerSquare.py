@@ -26,6 +26,34 @@ def drawSquareEvent(pixelVals, title="Camera map oversampled with squares", colo
         plt.colorbar()
         plt.show()
 
+def drawOversampled(z, cm = plt.cm.CMRmap, vmin=100, vmax=600, xmin=0, xmax = 54, ax=None, fig=None):
+    z_index = pd.read_csv("oversample_coordinates.csv")
+    if ax is None:
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+        doplot = True
+    else:
+        doplot = False
+    im = ax.pcolor(z.T, cmap=cm, vmin=vmin, vmax=vmax)
+    for pixNum in range(499):
+        ax.text(z_index.at[pixNum,'x1'], z_index.at[pixNum, 'y1'], pixNum, size=7)
+    ax.set_xlim(xmin, xmax)
+    ax.set_ylim(xmin, xmax)
+    fig.colorbar(im, ax=ax)
+    if doplot:
+        plt.show()
+    else:
+        return ax
+
+def drawArrayOversampled(zs, cm = plt.cm.CMRmap, vmin=100, vmax=600, xmin=0, xmax = 54):
+    z_index = pd.read_csv("oversample_coordinates.csv")
+    fig, ax = plt.subplots(2, 2)
+    for i in range(4):
+        ax_ = drawOversampled(zs[i], ax=ax.flatten()[i], fig=fig, cm = cm, vmin=vmin, vmax=vmax, xmin=xmin, xmax=xmax)
+    plt.tight_layout()
+    plt.show()
+
+
 #evt32 = df.iloc[[33]].values[0][504:504+500]
 #
 ##drawEvent(evt32, scale=(0,500), title="Raw Charge - T%d" % (1), colorbar_title = "Charge [DC]")
