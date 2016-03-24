@@ -40,3 +40,12 @@ def getVEGASon(f, runs, thetasq=0.01):
             train_x, train_y, test_x, test_y = concat_data(train_x, train_y, test_x, test_y, train_x_, train_y_, test_x_, test_y_)
 
     return train_x, train_y, test_x, test_y
+
+def concat_data(train_x1, train_y1, test_x1, test_y1, train_x2, train_y2, test_x2, test_y2):
+    train_x = np.concatenate((train_x1, train_x2), axis=0)
+    train_y = np.concatenate((train_y1, train_y2), axis=0)
+    test_x = np.concatenate((test_x1, test_x2), axis=0)
+    test_y = np.concatenate((test_y1, test_y2), axis=0)
+    return train_x, train_y, test_x, test_y
+
+
