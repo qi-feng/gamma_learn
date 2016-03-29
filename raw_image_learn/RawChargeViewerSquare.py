@@ -46,7 +46,7 @@ def drawOversampled(z, cm = plt.cm.CMRmap, vmin=100, vmax=600, xmin=0, xmax = 54
         return ax
 
 def drawArrayOversampled(zs, cm = plt.cm.CMRmap, vmin=100, vmax=600, xmin=0, xmax = 54):
-    z_index = pd.read_csv("oversample_coordinates.csv")
+    #z_index = pd.read_csv("oversample_coordinates.csv")
     fig, ax = plt.subplots(2, 2)
     for i in range(4):
         ax_ = drawOversampled(zs[i], ax=ax.flatten()[i], fig=fig, cm = cm, vmin=vmin, vmax=vmax, xmin=xmin, xmax=xmax)

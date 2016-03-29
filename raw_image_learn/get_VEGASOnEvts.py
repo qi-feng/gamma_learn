@@ -6,6 +6,11 @@ import cPickle as pickle
 import numpy as np
 from get_raw_features import *
 
+try:
+    ROOT.gSystem.Load("$VEGAS/common/lib/libSP24sharedLite.so")
+except:
+    print "Hey man, problem loading VEGAS, can't play with VEGAS root files..."
+
 def getVEGASonEvtNum(f, runnum=72045, thetasq=0.01):
     #f = ROOT.TFile.Open("config__1ES1215_/results__1ES1215_s6.root", "READ")
     f = ROOT.TFile.Open(f, "READ")
@@ -48,4 +53,34 @@ def concat_data(train_x1, train_y1, test_x1, test_y1, train_x2, train_y2, test_x
     test_y = np.concatenate((test_y1, test_y2), axis=0)
     return train_x, train_y, test_x, test_y
 
+def read_st2_charge(f, tels=[0,1,2,3]):
+    #io = ROOT.VARootIO("Oct2012_ua_ATM21_vegasv250rc5_7samples_20deg_050wobb_730noise.root", 1)
+    io = ROOT.VARootIO(f, 1)
+    q = io.loadTheQStatsData()
+    #tel loop
+    for tel in tels:
+        telQBase = q.fTelQBaseColl.at(tel)
+        telSliceQStats = q.fTimeSliceColl.at(0).fTelColl.at(tel)
+        #chan loop
+        for chan in range(telQBase.fChanColl.size()):
+            #telChanQ = telQBase.fChanColl.at(chan)
+            telChanQStats = telSliceQStats.fChanColl.at(chan)
+            #sample loop
+            for sample in range(telChanQStats.fSumWinColl.size()):
+                try:
+                    telChanSample = telChanQStats.fSumWinColl.at(sample)
+                    print sample, telChanSample.fChargeMean
+                except:
+                    print("Can't get charge from tel %d, channel %d, sample %d" % (tel, chan, sample))
 
+def mask_L2_channels_square(x, l2channels=[[110, 249, 255, 404], [128, 173, 259, 498], [37, 159, 319, 499], [99, 214, 333, 499]]):
+    assert len(x.shape)==4, "Expected a four dimension input features"
+    z_index = pd.read_csv("oversample_coordinates.csv")
+    z_index = z_index.drop(['x2', 'y2'], axis=1)
+    for evt in range(x.shape[0]):
+        for i, t in enumerate(l2channels):
+            for c in t:
+                #get neighbor pixels
+                neighbor_index = np.where((abs(z_index.values[:,0] - z_index.values[c, 0])< 3) & (abs(z_index.values[:,1] - z_index.values[c,1]) < 3) & (abs(z_index.values[:,0] - z_index.values[c, 0])+abs(z_index.values[:,1] - z_index.values[c,1])>0))
+                x[evt, i, z_index.values[c, 0].astype('int'), z_index.values[c, 1].astype('int')] = np.mean(x[evt, i, z_index.values[neighbor_index, 0].astype('int'), z_index.values[neighbor_index, 1].astype('int')])
+    return x

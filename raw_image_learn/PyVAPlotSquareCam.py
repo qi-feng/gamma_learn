@@ -386,7 +386,7 @@ def quick_oversample2(pixVals, z_index, numX=54):
     for i_ in range(len(pixVals)):
         x_ = int(z_index.at[i_, 'x1'])
         y_ = int(z_index.at[i_,'y1'])
-        z[x_:x_+1, y_:y_+1] = pixVals[i_]
+        z[x_:x_+2, y_:y_+2] = pixVals[i_]
     return z
 
 
