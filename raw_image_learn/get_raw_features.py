@@ -13,7 +13,11 @@ def quick_oversample2(pixVals, z_index, numX=54):
         z[x_:x_+2, y_:y_+2] = pixVals[i_]
     return z
 
-def get_raw_features(infile='64080.txt', in_pickle_onfile = 'on0.95_64080.pkl', in_pickle_offfile = 'off0.005_64080.pkl', test_ratio=0.3, random_state=1234, dump=False, out_trainx='64080_raw_trainx.pkl', out_trainy='64080_raw_trainy.pkl', out_testx='64080_raw_testx.pkl', out_testy='64080_raw_testy.pkl'):
+def get_raw_features(infile='64080.txt', in_pickle_onfile = 'on0.95_64080.pkl', in_pickle_offfile = 'off0.005_64080.pkl',
+                     test_ratio=0.3, random_state=1234, dump=False, maskL2=True,
+                     l2channels=[[110, 249, 255, 404, 475], [128, 173, 259, 498], [37, 159, 319, 451, 499], [99, 214, 333, 499]],
+                     out_trainx='64080_raw_trainx.pkl', out_trainy='64080_raw_trainy.pkl',
+                     out_testx='64080_raw_testx.pkl', out_testy='64080_raw_testy.pkl'):
     inputfile = open(in_pickle_onfile, 'rb')
     on = pickle.load(inputfile)
     inputfile.close()
@@ -31,6 +35,14 @@ def get_raw_features(infile='64080.txt', in_pickle_onfile = 'on0.95_64080.pkl', 
     
     #read oversample z index:
     z_index = pd.read_csv("oversample_coordinates.csv")
+    z_index = z_index.drop(['x2', 'y2'], axis=1)
+
+    #if maskL2:
+    #    try:
+    #        neighborIDs = pd.read_csv("neighborID.csv")
+    #    except:
+    #        print "Can't load neighbor pixel IDs from neighborID.csv, not masking L2s"
+    #        maskL2=False
 
     # read certain lines in a file, fast skipping
     current_ = 1
@@ -43,6 +55,12 @@ def get_raw_features(infile='64080.txt', in_pickle_onfile = 'on0.95_64080.pkl', 
                 x_on_entry = np.array(line[0].split())
                 for j_ in range(4):
                     x_on[i_, j_] = quick_oversample2(x_on_entry[504+4016/4*j_:504+500+4016/4*j_], z_index)
+                    if maskL2:
+                        for c in l2channels[j_]:
+                            #get neighbor pixels
+                            neighbor_index = np.where((abs(z_index.values[:,0] - z_index.values[c, 0])< 3) & (abs(z_index.values[:,1] - z_index.values[c,1]) < 3) & (abs(z_index.values[:,0] - z_index.values[c, 0])+abs(z_index.values[:,1] - z_index.values[c,1])>0))
+                            x_on[i_, j_, z_index.values[c, 0].astype('int'):z_index.values[c, 0].astype('int')+2, z_index.values[c, 1].astype('int'):z_index.values[c, 1].astype('int')+2] = np.mean(x_on[i_, j_, z_index.values[neighbor_index, 0].astype('int'), z_index.values[neighbor_index, 1].astype('int')])
+
                 current_ = on_+1
             except:
                 print("Problem reading line %d: %s" % (on_, line))
@@ -56,6 +74,12 @@ def get_raw_features(infile='64080.txt', in_pickle_onfile = 'on0.95_64080.pkl', 
                 x_off_entry = np.array(line[0].split())
                 for j_ in range(4):
                     x_off[i_, j_] = quick_oversample2(x_off_entry[504+4016/4*j_:504+500+4016/4*j_], z_index)
+                    if maskL2:
+                        for c in l2channels[j_]:
+                            #get neighbor pixels
+                            neighbor_index = np.where((abs(z_index.values[:,0] - z_index.values[c, 0])< 3) & (abs(z_index.values[:,1] - z_index.values[c,1]) < 3) & (abs(z_index.values[:,0] - z_index.values[c, 0])+abs(z_index.values[:,1] - z_index.values[c,1])>0))
+                            x_off[i_, j_, z_index.values[c, 0].astype('int'):z_index.values[c, 0].astype('int')+2, z_index.values[c, 1].astype('int'):z_index.values[c, 1].astype('int')+2] = np.mean(x_off[i_, j_, z_index.values[neighbor_index, 0].astype('int'), z_index.values[neighbor_index, 1].astype('int')])
+
                 current_ = off_+1
             except:
                 print("Problem reading line %d: %s" % (off_, line))
@@ -80,7 +104,8 @@ def get_raw_features(infile='64080.txt', in_pickle_onfile = 'on0.95_64080.pkl', 
     return train_x, train_y, test_x, test_y
 
 def get_raw_features_on(infile='72044.txt', in_pickle_onfile = 'on72044.pkl', test_ratio=0.3, random_state=1234, 
-                        dump=False, out_trainx='72044_raw_trainx_on.pkl', out_trainy='72044_raw_trainy_on.pkl', 
+                        dump=False, out_trainx='72044_raw_trainx_on.pkl', out_trainy='72044_raw_trainy_on.pkl', maskL2=True,
+                        l2channels=[[110, 249, 255, 404, 475], [128, 173, 259, 498], [37, 159, 319, 451, 499], [99, 214, 333, 499]],
                         out_testx='72044_raw_testx_on.pkl', out_testy='72044_raw_testy_on.pkl'):
     inputfile = open(in_pickle_onfile, 'rb')
     on = pickle.load(inputfile)
@@ -90,6 +115,8 @@ def get_raw_features_on(infile='72044.txt', in_pickle_onfile = 'on72044.pkl', te
     y_on = np.ones(on.shape[0])
     #read oversample z index:
     z_index = pd.read_csv("oversample_coordinates.csv")
+    z_index = z_index.drop(['x2', 'y2'], axis=1)
+
     # read certain lines in a file, fast skipping
     current_ = 1
     with open(infile) as f:
@@ -100,6 +127,12 @@ def get_raw_features_on(infile='72044.txt', in_pickle_onfile = 'on72044.pkl', te
                 x_on_entry = np.array(line[0].split())
                 for j_ in range(4):
                     x_on[i_, j_] = quick_oversample2(x_on_entry[504+4016/4*j_:504+500+4016/4*j_], z_index)
+                    if maskL2:
+                        for c in l2channels[j_]:
+                            #get neighbor pixels
+                            neighbor_index = np.where((abs(z_index.values[:,0] - z_index.values[c, 0])< 3) & (abs(z_index.values[:,1] - z_index.values[c,1]) < 3) & (abs(z_index.values[:,0] - z_index.values[c, 0])+abs(z_index.values[:,1] - z_index.values[c,1])>0))
+                            x_on[i_, j_, z_index.values[c, 0].astype('int'):z_index.values[c, 0].astype('int')+2, z_index.values[c, 1].astype('int'):z_index.values[c, 1].astype('int')+2] = np.mean(x_on[i_, j_, z_index.values[neighbor_index, 0].astype('int'), z_index.values[neighbor_index, 1].astype('int')])
+
                 current_ = on_+1
             except:
                 print("Problem reading line %d: %s" % (on_, line))
