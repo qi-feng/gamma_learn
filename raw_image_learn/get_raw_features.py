@@ -55,7 +55,7 @@ def get_raw_features(infile='64080.txt', in_pickle_onfile = 'on0.95_64080.pkl', 
                 #print i_, off_, np.array(line[0].split())
                 x_off_entry = np.array(line[0].split())
                 for j_ in range(4):
-                    x_off[i_] = quick_oversample2(x_off_entry[504+4016/4*j_:504+500+4016/4*j_], z_index)
+                    x_off[i_, j_] = quick_oversample2(x_off_entry[504+4016/4*j_:504+500+4016/4*j_], z_index)
                 current_ = off_+1
             except:
                 print("Problem reading line %d: %s" % (off_, line))
