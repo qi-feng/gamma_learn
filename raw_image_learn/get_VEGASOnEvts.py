@@ -4,6 +4,7 @@ __author__ = 'qfeng'
 import ROOT
 import cPickle as pickle
 import numpy as np
+import pandas as pd
 from get_raw_features import *
 
 try:
@@ -73,6 +74,64 @@ def read_st2_charge(f, tels=[0,1,2,3]):
                 except:
                     print("Can't get charge from tel %d, channel %d, sample %d" % (tel, chan, sample))
 
+def quick_oversample2(pixVals, z_index, numX=54):
+    z = -np.ones((numX, numX))
+    for i_ in range(len(pixVals)):
+        x_ = int(z_index.at[i_, 'x1'])
+        y_ = int(z_index.at[i_,'y1'])
+        z[x_:x_+2, y_:y_+2] = pixVals[i_]
+    return z
+
+def read_st2_calib_charge(f, tels=[0,1,2,3], maskL2=True, l2channels=[[110, 249, 255, 404], [128, 173, 259, 498], [37, 159, 319, 499], [99, 214, 333, 499]], outfile=None):
+    calib_io = ROOT.VARootIO(f, 1)
+    calibTree = calib_io.loadTheCalibratedEventTree()
+    calibEvtData = ROOT.VACalibratedArrayEvent()
+    calibTree.SetBranchAddress("C", calibEvtData)
+    calibTree.SetBranchAddress("C", calibEvtData)
+
+    #evtNum = []
+    totalEvtNum = calibTree.GetEntries()
+    allCharge = np.zeros((4, 500, totalEvtNum))
+    oversampledCharge = np.zeros((totalEvtNum, 4, 54, 54))
+
+    try:
+        z_index = pd.read_csv("oversample_coordinates.csv")
+    except:
+        print "Can't load square coordinates for oversampled camera"
+
+    if maskL2:
+        try:
+            neighborIDs = pd.read_csv("neighborID.csv")
+        except:
+            print "Can't load neighbor pixel IDs from neighborID.csv, not masking L2s"
+            maskL2=False
+
+    for evt in range(totalEvtNum):
+        calibTree.GetEntry(evt)
+        #evtNum.append(int(calibEvtData.fArrayEventNum))
+        for telID in tels:
+            try:
+                for chanID in range(500):
+                    allCharge[telID][chanID][evt] = calibEvtData.fTelEvents.at(telID).fChanData.at(chanID).fCharge
+                    #hiLo[telID][chanID][evt] = calibEvtData.fTelEvents.at(telID).fChanData.at(chanID).fHiLo
+                if maskL2:
+                    for l2chan in l2channels[telID]:
+                        neighborCharges = []
+                        for nc in neighborIDs.iloc[l2chan,1][1:-1].split():
+                            neighborCharges.append(allCharge[telID][int(nc)][evt])
+                        allCharge[telID][l2chan][evt] = np.mean(neighborCharges)
+                oversampledCharge[evt, telID] = quick_oversample2(allCharge[telID, :, evt], z_index)
+            except:
+                #print "tel ", telID, "chan ",chanID, " event ", evt, " failed to get charge "
+                allCharge[telID][chanID][evt]=0.
+    if outfile is not None:
+        output = open(outfile, 'wb')
+        pickle.dump(oversampledCharge, output)
+        output.close()
+        #pd.DataFrame(allCharge).to_csv(outfile, index=False, header=None)
+    else:
+        return oversampledCharge
+
 def mask_L2_channels_square(x, l2channels=[[110, 249, 255, 404], [128, 173, 259, 498], [37, 159, 319, 499], [99, 214, 333, 499]]):
     assert len(x.shape)==4, "Expected a four dimension input features"
     z_index = pd.read_csv("oversample_coordinates.csv")
@@ -82,5 +141,20 @@ def mask_L2_channels_square(x, l2channels=[[110, 249, 255, 404], [128, 173, 259,
             for c in t:
                 #get neighbor pixels
                 neighbor_index = np.where((abs(z_index.values[:,0] - z_index.values[c, 0])< 3) & (abs(z_index.values[:,1] - z_index.values[c,1]) < 3) & (abs(z_index.values[:,0] - z_index.values[c, 0])+abs(z_index.values[:,1] - z_index.values[c,1])>0))
-                x[evt, i, z_index.values[c, 0].astype('int'), z_index.values[c, 1].astype('int')] = np.mean(x[evt, i, z_index.values[neighbor_index, 0].astype('int'), z_index.values[neighbor_index, 1].astype('int')])
+                x[evt, i, z_index.values[c, 0].astype('int'):z_index.values[c, 0].astype('int')+2, z_index.values[c, 1].astype('int'):z_index.values[c, 1].astype('int')+2] = np.mean(x[evt, i, z_index.values[neighbor_index, 0].astype('int'), z_index.values[neighbor_index, 1].astype('int')])
     return x
+
+def dump_neighbor_pixels(outf):
+    z_index = pd.read_csv("oversample_coordinates.csv")
+    z_index = z_index.drop(['x2', 'y2'], axis=1)
+    chans = range(500)
+    neighbor_indices = []
+    #df = pd.DataFrame(np.zeros((500, 2)), columns=['chanID', 'neighborID'])
+    for c in chans:
+        neighbor_index = np.where((abs(z_index.values[:,0] - z_index.values[c, 0])< 3) & (abs(z_index.values[:,1] - z_index.values[c,1]) < 3) & (abs(z_index.values[:,0] - z_index.values[c, 0])+abs(z_index.values[:,1] - z_index.values[c,1])>0))
+        neighbor_indices.append(np.array(neighbor_index[0]))
+        #f.iloc[c] = [c, neighbor_index]
+    df = pd.DataFrame({'chanID' : chans, 'neighborID' : neighbor_indices},index=chans)
+    df.to_csv(outf, index=False)
+
+
