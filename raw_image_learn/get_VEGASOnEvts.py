@@ -82,7 +82,9 @@ def quick_oversample2(pixVals, z_index, numX=54):
         z[x_:x_+2, y_:y_+2] = pixVals[i_]
     return z
 
-def read_st2_calib_charge(f, tels=[0,1,2,3], maskL2=True, l2channels=[[110, 249, 255, 404, 475], [128, 173, 259, 498], [37, 159, 319, 451, 499], [99, 214, 333, 499]], outfile=None):
+def read_st2_calib_charge(f, tels=[0,1,2,3], maskL2=True,
+                          l2channels=[[110, 249, 255, 404, 475], [128, 173, 259, 498, 499], [37, 159, 319, 451, 499], [99, 214, 333, 499]],
+                          start_event=None, stop_event=None, outfile=None):
     calib_io = ROOT.VARootIO(f, 1)
     calibTree = calib_io.loadTheCalibratedEventTree()
     calibEvtData = ROOT.VACalibratedArrayEvent()
@@ -90,9 +92,24 @@ def read_st2_calib_charge(f, tels=[0,1,2,3], maskL2=True, l2channels=[[110, 249,
     calibTree.SetBranchAddress("C", calibEvtData)
 
     #evtNum = []
-    totalEvtNum = calibTree.GetEntries()
-    allCharge = np.zeros((4, 500, totalEvtNum))
-    oversampledCharge = np.zeros((totalEvtNum, 4, 54, 54))
+    if start_event is None:
+        start_event=0
+    if stop_event is None:
+        totalEvtNum = calibTree.GetEntries()
+        print "You want to get charge from all events."
+    else:
+        assert start_event<start_event, "Please specify sensible start_event and stop_event numbers. "
+        totalEvtNum = stop_event+1-start_event
+
+    print("Processing %d events." % totalEvtNum)
+
+    try:
+        allCharge = np.zeros((4, 500, totalEvtNum))
+        oversampledCharge = np.zeros((totalEvtNum, 4, 54, 54))
+    except MemoryError:
+        print("Such a large number of events caused a MemoryError... "
+              "Let's try passing start_event and stop_event to analyze a smaller set of events.")
+        raise
 
     try:
         z_index = pd.read_csv("oversample_coordinates.csv")
@@ -106,7 +123,7 @@ def read_st2_calib_charge(f, tels=[0,1,2,3], maskL2=True, l2channels=[[110, 249,
             print "Can't load neighbor pixel IDs from neighborID.csv, not masking L2s"
             maskL2=False
 
-    for evt in range(totalEvtNum):
+    for evt in range(start_event, totalEvtNum):
         calibTree.GetEntry(evt)
         #evtNum.append(int(calibEvtData.fArrayEventNum))
         for telID in tels:
