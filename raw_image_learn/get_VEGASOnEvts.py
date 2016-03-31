@@ -89,7 +89,7 @@ def read_st2_calib_charge(f, tels=[0,1,2,3], maskL2=True,
     calibTree = calib_io.loadTheCalibratedEventTree()
     calibEvtData = ROOT.VACalibratedArrayEvent()
     calibTree.SetBranchAddress("C", calibEvtData)
-    calibTree.SetBranchAddress("C", calibEvtData)
+    #calibTree.SetBranchAddress("C", calibEvtData)
 
     #evtNum = []
     if start_event is None:
@@ -124,12 +124,18 @@ def read_st2_calib_charge(f, tels=[0,1,2,3], maskL2=True,
             maskL2=False
 
     for evt in range(start_event, totalEvtNum):
-        calibTree.GetEntry(evt)
+        try:
+            calibTree.GetEntry(evt)
+        except:
+            print("Can't get calibrated event number %d" % evt)
         #evtNum.append(int(calibEvtData.fArrayEventNum))
         for telID in tels:
             try:
                 for chanID in range(500):
-                    allCharge[telID][chanID][evt] = calibEvtData.fTelEvents.at(telID).fChanData.at(chanID).fCharge
+                    try:
+                        allCharge[telID][chanID][evt] = calibEvtData.fTelEvents.at(telID).fChanData.at(chanID).fCharge
+                    except:
+                        print("Can't get charge from tel %d channel %d for calibrated event number %d" % (telID, chanID, evt))
                     #hiLo[telID][chanID][evt] = calibEvtData.fTelEvents.at(telID).fChanData.at(chanID).fHiLo
                 if maskL2:
                     for l2chan in l2channels[telID]:
@@ -139,15 +145,14 @@ def read_st2_calib_charge(f, tels=[0,1,2,3], maskL2=True,
                         allCharge[telID][l2chan][evt] = np.mean(neighborCharges)
                 oversampledCharge[evt, telID] = quick_oversample2(allCharge[telID, :, evt], z_index)
             except:
-                #print "tel ", telID, "chan ",chanID, " event ", evt, " failed to get charge "
+                print "tel ", telID, "chan ",chanID, " event ", evt, " failed to get charge "
                 allCharge[telID][chanID][evt]=0.
     if outfile is not None:
         output = open(outfile, 'wb')
         pickle.dump(oversampledCharge, output)
         output.close()
         #pd.DataFrame(allCharge).to_csv(outfile, index=False, header=None)
-    else:
-        return oversampledCharge
+    return oversampledCharge
 
 def mask_L2_channels_square(x, l2channels=[[110, 249, 255, 404, 475], [128, 173, 259, 498], [37, 159, 319, 451, 499], [99, 214, 333, 499]]):
     assert len(x.shape)==4, "Expected a four dimension input features"

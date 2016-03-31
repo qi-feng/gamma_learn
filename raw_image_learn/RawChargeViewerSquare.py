@@ -1,5 +1,6 @@
 
 from PyVAPlotSquareCam import *
+import pandas as pd
 
 df = pd.read_csv("64081.txt", sep = r"\s+", header=None, nrows=200)
 
@@ -45,11 +46,18 @@ def drawOversampled(z, cm = plt.cm.CMRmap, vmin=100, vmax=600, xmin=0, xmax = 54
     else:
         return ax
 
-def drawArrayOversampled(zs, cm = plt.cm.CMRmap, vmin=100, vmax=600, xmin=0, xmax = 54):
+def drawArrayOversampled(zs, cm = plt.cm.CMRmap, vmin=100, vmax=600, xmin=0, xmax = 54, suppress_axes=True):
     #z_index = pd.read_csv("oversample_coordinates.csv")
     fig, ax = plt.subplots(2, 2)
     for i in range(4):
         ax_ = drawOversampled(zs[i], ax=ax.flatten()[i], fig=fig, cm = cm, vmin=vmin, vmax=vmax, xmin=xmin, xmax=xmax)
+        if suppress_axes:
+            ax_.set_frame_on(False)
+            ax_.set_xticklabels([])
+            ax_.set_xticks([])
+            ax_.set_yticklabels([])
+            ax_.set_yticks([])
+
     plt.tight_layout()
     plt.show()
 
