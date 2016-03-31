@@ -98,7 +98,7 @@ def read_st2_calib_charge(f, tels=[0,1,2,3], maskL2=True,
         totalEvtNum = calibTree.GetEntries()
         print "You want to get charge from all events."
     else:
-        assert start_event<start_event, "Please specify sensible start_event and stop_event numbers. "
+        assert start_event<stop_event, "Please specify sensible start_event and stop_event numbers. "
         totalEvtNum = stop_event+1-start_event
 
     print("Processing %d events." % totalEvtNum)
