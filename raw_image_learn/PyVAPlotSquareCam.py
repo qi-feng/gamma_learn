@@ -6,7 +6,7 @@ from matplotlib.patches import Polygon, Rectangle
 from matplotlib.collections import PatchCollection
 import numpy as np
 import math
-import pandas as pd
+#import pandas as pd
 
 class PyVAPlotSquareCam:
     
@@ -284,7 +284,7 @@ class PyVAPlotSquareCam:
     #         Make oversampled square, and use Gaussian kernels                #
     ############################################################################
 
-    def oversample(self, rate=2, cam_radius=19.):
+    def oversample(self, rate=2):
         #oversampling at rate 2 means 4 squares for a pixel
         assert isinstance( rate, int ), "can only oversample at integer rate"
         self.size=np.sqrt(2.)/rate
@@ -300,13 +300,13 @@ class PyVAPlotSquareCam:
         #self.zpix = np.zeros((numX, numX))
         self.x = self.pos[:,0]/np.sqrt(2.)*rate
         self.y = self.pos[:,1]/np.sqrt(2.)*rate
-        self.testdf = pd.DataFrame(index=range(500), columns=['xpos', 'xind', 'ypos', 'yind'])
+        #self.testdf = pd.DataFrame(index=range(500), columns=['xpos', 'xind', 'ypos', 'yind'])
         #self.x = np.arange(-cam_radius, cam_radius+size, size)
         #self.y = np.arange(-cam_radius, cam_radius+size, size)
         for i_ in range(len(self.pixVals)):
             #print "Pixel ", i_, "x",  self.x[i_], (self.pos[i_,0]-np.min(self.pos))/np.sqrt(2.)*rate
             #print "y", self.y[i_], (self.pos[i_,1]-np.min(self.pos))/np.sqrt(2.)*rate
-            self.testdf.iloc[i_] = self.x[i_], (self.pos[i_,0]-np.min(self.pos))/np.sqrt(2.)*rate, self.y[i_], (self.pos[i_,1]-np.min(self.pos))/np.sqrt(2.)*rate
+            #self.testdf.iloc[i_] = self.x[i_], (self.pos[i_,0]-np.min(self.pos))/np.sqrt(2.)*rate, self.y[i_], (self.pos[i_,1]-np.min(self.pos))/np.sqrt(2.)*rate
             #x_ = (self.pos[i_,0]-np.min(self.pos))/np.sqrt(2.)*2.
             #y_ = (self.pos[i_,1]-np.min(self.pos))/np.sqrt(2.)*2.
             x_ = int(round(self.x[i_] -np.min(self.x)))
@@ -331,8 +331,64 @@ class PyVAPlotSquareCam:
         plt.colorbar()
         plt.show()
 
+    def get_gradient(self):
+        #edge of the oversampled cam to get rid of when calculating the gradient
+        x_edge_gx = np.array([ 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  1,  1,  1,  1,
+                1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  2,  2,  2,  2,  2,  2,
+                2,  2,  2,  2,  2,  2,  3,  3,  3,  3,  3,  3,  3,  3,  4,  4,  4,
+                4,  4,  4,  4,  4,  5,  5,  5,  5,  5,  5,  5,  5,  6,  6,  6,  6,
+                8,  8,  8,  8,  9,  9,  9,  9,  9,  9,  9,  9, 10, 10, 10, 10, 12,
+               12, 12, 12, 13, 13, 13, 13, 17, 17, 17, 17, 18, 18, 18, 18, 29, 29,
+               29, 29, 30, 30, 30, 30, 34, 34, 34, 34, 35, 35, 35, 35, 37, 37, 37,
+               37, 38, 38, 38, 38, 38, 38, 38, 38, 39, 39, 39, 39, 41, 41, 41, 41,
+               42, 42, 42, 42, 42, 42, 42, 42, 43, 43, 43, 43, 43, 43, 43, 43, 44,
+               44, 44, 44, 44, 44, 44, 44, 45, 45, 45, 45, 45, 45, 45, 45, 45, 45,
+               45, 45, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46,
+               46, 46, 46, 47, 47, 47, 47, 47, 47, 47, 47, 47, 47, 47, 47, 47, 47,
+               48, 48, 48, 48])
+        y_edge_gx = np.array([18, 19, 22, 23, 26, 27, 30, 31, 34, 35, 16, 17, 18, 19, 20, 21, 22,
+               23, 26, 27, 30, 31, 32, 33, 34, 35, 36, 37, 14, 15, 16, 17, 20, 21,
+               32, 33, 36, 37, 38, 39, 12, 13, 14, 15, 38, 39, 40, 41, 10, 11, 12,
+               13, 40, 41, 42, 43,  8,  9, 10, 11, 42, 43, 44, 45,  8,  9, 44, 45,
+                6,  7, 46, 47,  4,  5,  6,  7, 46, 47, 48, 49,  4,  5, 48, 49,  2,
+                3, 50, 51,  2,  3, 50, 51,  0,  1, 52, 53,  0,  1, 52, 53,  0,  1,
+               52, 53,  0,  1, 52, 53,  2,  3, 50, 51,  2,  3, 50, 51,  4,  5, 48,
+               49,  4,  5,  6,  7, 46, 47, 48, 49,  6,  7, 46, 47,  8,  9, 44, 45,
+                8,  9, 10, 11, 42, 43, 44, 45, 10, 11, 12, 13, 40, 41, 42, 43, 12,
+               13, 14, 15, 38, 39, 40, 41, 14, 15, 16, 17, 20, 21, 32, 33, 36, 37,
+               38, 39, 16, 17, 18, 19, 20, 21, 22, 23, 26, 27, 30, 31, 32, 33, 34,
+               35, 36, 37, 18, 19, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 34, 35,
+               24, 25, 28, 29])
+        x_edge_gy = np.array([ 0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  1,  1,  1,  1,  1,  1,
+                1,  1,  1,  2,  2,  2,  2,  3,  3,  3,  3,  4,  4,  4,  4,  5,  5,
+                5,  5,  6,  6,  6,  6,  7,  7,  7,  7,  8,  8,  8,  8,  9,  9,  9,
+                9, 10, 10, 10, 10, 11, 11, 11, 11, 12, 12, 12, 12, 13, 13, 13, 13,
+               14, 14, 14, 14, 15, 15, 15, 15, 16, 16, 16, 16, 17, 17, 17, 17, 30,
+               30, 30, 30, 31, 31, 31, 31, 32, 32, 32, 32, 33, 33, 33, 33, 34, 34,
+               34, 34, 35, 35, 35, 35, 36, 36, 36, 36, 37, 37, 37, 37, 38, 38, 38,
+               38, 39, 39, 39, 39, 40, 40, 40, 40, 41, 41, 41, 41, 42, 42, 42, 42,
+               43, 43, 43, 43, 44, 44, 44, 44, 45, 45, 45, 45, 46, 46, 46, 46, 46,
+               46, 46, 46, 46, 46, 46, 46, 47, 47, 47, 47, 47, 47, 47, 47])
+        y_edge_gy = np.array([23, 24, 25, 26, 27, 28, 29, 30, 17, 18, 19, 20, 21, 22, 31, 32, 33,
+               34, 35, 36, 15, 16, 37, 38, 13, 14, 39, 40, 11, 12, 41, 42,  9, 10,
+               43, 44,  7,  8, 45, 46,  7,  8, 45, 46,  7,  8, 45, 46,  5,  6, 47,
+               48,  3,  4, 49, 50,  3,  4, 49, 50,  3,  4, 49, 50,  1,  2, 51, 52,
+                1,  2, 51, 52,  1,  2, 51, 52,  1,  2, 51, 52,  1,  2, 51, 52,  1,
+                2, 51, 52,  1,  2, 51, 52,  1,  2, 51, 52,  1,  2, 51, 52,  1,  2,
+               51, 52,  3,  4, 49, 50,  3,  4, 49, 50,  3,  4, 49, 50,  5,  6, 47,
+               48,  7,  8, 45, 46,  7,  8, 45, 46,  7,  8, 45, 46,  9, 10, 43, 44,
+               11, 12, 41, 42, 13, 14, 39, 40, 15, 16, 37, 38, 17, 18, 19, 20, 21,
+               22, 31, 32, 33, 34, 35, 36, 23, 24, 25, 26, 27, 28, 29, 30])
 
-    def GaussianKernel(self, x=0, y=0, val=1., size=2, stddev = 0.6):
+        self.gx, self.gy = np.gradient(self.z)
+        for x_, y_ in zip(x_edge_gx, y_edge_gx):
+            self.gx[x_,y_]=0
+        for x_, y_ in zip(x_edge_gy, y_edge_gy):
+            self.gy[x_,y_]=0
+        return np.mean(self.gx), np.mean(self.gy)
+
+
+    def GaussianKernel(self, x=0, y=0, val=1., size=2, stddev = 0.6, cam_radius=19.):
         """
         self.z is the square grid (oversampled)
         add a Gaussian centered at x, y to z
@@ -379,6 +435,8 @@ class PyVAPlotSquareCam:
         for y in self.y:
             plt.plot([self.x[0], self.x[-1]], [y, y], color='black', alpha=.33, linestyle=':')
         #plt.show()
+
+
 
 
 def quick_oversample2(pixVals, z_index, numX=54):
