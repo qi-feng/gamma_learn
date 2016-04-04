@@ -436,6 +436,32 @@ class PyVAPlotSquareCam:
             plt.plot([self.x[0], self.x[-1]], [y, y], color='black', alpha=.33, linestyle=':')
         #plt.show()
 
+    def find_neighbors(self):
+
+        top_right_neighbor = -np.ones(500)
+        top_left_neighbor = -np.ones(500)
+        right_neighbor = -np.ones(500)
+
+        for i, pos in enumerate(self.pos):
+            for j in range(self.pos.shape[0]):
+                bool1, bool2 = abs(self.pos[j] - pos - np.array([0.70710678, 1.41421356])) < np.array([1e-3, 1e-3])
+                if bool1 and bool2:
+                    print("Channel %d 's top right neighbor is channel %d" % (i, j))
+                    top_right_neighbor[i]=j
+                elif bool2:
+                    bool3, bool4 = abs(self.pos[j] - pos - np.array([-0.70710678, 1.41421356])) < np.array([1e-3, 1e-3])
+                    if bool3:
+                        print("Channel %d 's top left neighbor is channel %d" % (i, j))
+                        top_left_neighbor[i]=j
+                else:
+                    bool5, bool6 = abs(self.pos[j] - pos - np.array([1.41421356, 0])) < np.array([1e-3, 1e-3])
+                    if bool5 and bool6:
+                        print("Channel %d 's right neighbor is channel %d" % (i, j))
+                        right_neighbor[i]=j
+
+        self.top_right_neighbor = top_right_neighbor
+        self.top_left_neighbor = top_left_neighbor
+        self.right_neighbor = right_neighbor
 
 
 

@@ -126,7 +126,7 @@ def read_st2_calib_charge(f, tels=[0,1,2,3], maskL2=True,
             print "Can't load neighbor pixel IDs from neighborID.csv, not masking L2s"
             maskL2=False
 
-    for evt in evtlist:
+    for evt_count, evt in enumerate(evtlist):
         try:
             calibTree.GetEntry(evt)
         except:
@@ -136,7 +136,7 @@ def read_st2_calib_charge(f, tels=[0,1,2,3], maskL2=True,
             try:
                 for chanID in range(500):
                     try:
-                        allCharge[telID][chanID][evt] = calibEvtData.fTelEvents.at(telID).fChanData.at(chanID).fCharge
+                        allCharge[telID][chanID][evt_count] = calibEvtData.fTelEvents.at(telID).fChanData.at(chanID).fCharge
                     except:
                         print("Can't get charge from tel %d channel %d for calibrated event number %d" % (telID, chanID, evt))
                     #hiLo[telID][chanID][evt] = calibEvtData.fTelEvents.at(telID).fChanData.at(chanID).fHiLo
@@ -144,12 +144,12 @@ def read_st2_calib_charge(f, tels=[0,1,2,3], maskL2=True,
                     for l2chan in l2channels[telID]:
                         neighborCharges = []
                         for nc in neighborIDs.iloc[l2chan,1][1:-1].split():
-                            neighborCharges.append(allCharge[telID][int(nc)][evt])
-                        allCharge[telID][l2chan][evt] = np.mean(neighborCharges)
-                oversampledCharge[evt, telID] = quick_oversample2(allCharge[telID, :, evt], z_index)
+                            neighborCharges.append(allCharge[telID][int(nc)][evt_count])
+                        allCharge[telID][l2chan][evt_count] = np.mean(neighborCharges)
+                oversampledCharge[evt_count, telID] = quick_oversample2(allCharge[telID, :, evt_count], z_index)
             except:
                 print "tel ", telID, "chan ",chanID, " event ", evt, " failed to get charge "
-                allCharge[telID][chanID][evt]=0.
+                allCharge[telID][chanID][evt_count]=0.
     if outfile is not None:
         output = open(outfile, 'wb')
         pickle.dump(oversampledCharge, output)
