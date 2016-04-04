@@ -84,7 +84,7 @@ def quick_oversample2(pixVals, z_index, numX=54):
 
 def read_st2_calib_charge(f, tels=[0,1,2,3], maskL2=True,
                           l2channels=[[110, 249, 255, 404, 475], [128, 173, 259, 498, 499], [37, 159, 319, 451, 499], [99, 214, 333, 499]],
-                          start_event=None, stop_event=None, outfile=None):
+                          start_event=None, stop_event=None, evtlist=None, outfile=None):
     calib_io = ROOT.VARootIO(f, 1)
     calibTree = calib_io.loadTheCalibratedEventTree()
     calibEvtData = ROOT.VACalibratedArrayEvent()
@@ -94,12 +94,15 @@ def read_st2_calib_charge(f, tels=[0,1,2,3], maskL2=True,
     #evtNum = []
     if start_event is None:
         start_event=0
-    if stop_event is None:
+    if stop_event is None and evtlist is None:
         totalEvtNum = calibTree.GetEntries()
         print "You want to get charge from all events."
-    else:
+    elif evtlist is None:
         assert start_event<stop_event, "Please specify sensible start_event and stop_event numbers. "
         totalEvtNum = stop_event+1-start_event
+        evtlist = range(start_event, stop_event+1)
+    else:
+        totalEvtNum = len(evtlist)
 
     print("Processing %d events." % totalEvtNum)
 
@@ -108,7 +111,7 @@ def read_st2_calib_charge(f, tels=[0,1,2,3], maskL2=True,
         oversampledCharge = np.zeros((totalEvtNum, 4, 54, 54))
     except MemoryError:
         print("Such a large number of events caused a MemoryError... "
-              "Let's try passing start_event and stop_event to analyze a smaller set of events.")
+              "Let's try passing start_event and stop_event or evtlist to analyze a smaller set of events.")
         raise
 
     try:
@@ -123,7 +126,7 @@ def read_st2_calib_charge(f, tels=[0,1,2,3], maskL2=True,
             print "Can't load neighbor pixel IDs from neighborID.csv, not masking L2s"
             maskL2=False
 
-    for evt in range(start_event, totalEvtNum):
+    for evt in evtlist:
         try:
             calibTree.GetEntry(evt)
         except:
