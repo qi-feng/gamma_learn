@@ -7,7 +7,7 @@ from keras.layers.convolutional import Convolution2D, MaxPooling2D
 from keras.optimizers import SGD
 #from keras.layers.normalization import BatchNormalization
 #from keras.layers.advanced_activations import PReLU
-#from keras.utils import np_utils, generic_utils
+from keras.utils import np_utils, generic_utils
 from sklearn.metrics import roc_auc_score, roc_curve, auc
 from get_raw_features import *
 import numpy as np
@@ -16,7 +16,7 @@ from sklearn.cross_validation import StratifiedShuffleSplit
 
 def do_cnn(train_x, train_y, test_x, test_y, input_shape=(4, 54, 54), filter_n1=64, filter_size1=6, filter_stride1=2,
            border_mode1='same', filter_n2=64, filter_size2=6, filter_stride2=2, border_mode2='same', pool_size1=3,
-           pool_size2=2, filter_drop1=0.25, filter_drop2=0.25,
+           pool_size2=2, filter_drop1=0.25, filter_drop2=0.25, nb_classes=1, loss_func='binary_crossentropy',
            dense_n1=512, dense_drop1=0.5, dense_n2=256, dense_drop2=0.5, batch_size=128, nb_epoch=5):
     print("Building a ConvNet model...")
     model = Sequential()
@@ -56,17 +56,20 @@ def do_cnn(train_x, train_y, test_x, test_y, input_shape=(4, 54, 54), filter_n1=
     model.add(Activation('relu'))
     model.add(Dropout(dense_drop2))
 
-    model.add(Dense(1))
-    #model.add(Activation('softmax'))
-    model.add(Activation('sigmoid'))
+    if nb_classes==1:
+        model.add(Dense(1))
+        model.add(Activation('sigmoid'))
+    elif nb_classes>1:
+        model.add(Dense(nb_classes))
+        model.add(Activation('softmax'))
 
     sgd = SGD(lr=0.1, decay=1e-6, momentum=0.9, nesterov=True)
     #model.compile(loss='categorical_crossentropy', optimizer=sgd)
-    model.compile(loss='binary_crossentropy', optimizer=sgd)
+    model.compile(loss=loss_func, optimizer=sgd)
     #model.compile(loss='binary_crossentropy', optimizer="rmsprop")
 
     print("Training the ConvNet model...")
-    m_history = model.fit(train_x, train_y, batch_size=batch_size, nb_epoch=nb_epoch)
+    m_history = model.fit(train_x, train_y, batch_size=batch_size, nb_epoch=nb_epoch, show_accuracy=True)
 
     objective_score = model.evaluate(test_x, test_y, batch_size=batch_size)
     print "The objective score on test data is", objective_score
@@ -175,4 +178,4 @@ def split_train_test(x, y, ratio=0.2, random_state=1234):
         break
     train_x, train_y = x[train_index], y[train_index]
     test_x, test_y = x[test_index], y[test_index]
-    return train_x, train_y, test_x, test_y
+    return train_x.astype('float32'), train_y.astype('float32'), test_x.astype('float32'), test_y.astype('float32')
