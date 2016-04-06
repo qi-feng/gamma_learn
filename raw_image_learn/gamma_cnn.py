@@ -11,35 +11,38 @@ from keras.optimizers import SGD
 from sklearn.metrics import roc_auc_score, roc_curve, auc
 from get_raw_features import *
 import numpy as np
+from sklearn.cross_validation import StratifiedShuffleSplit
 
 
-def do_cnn(train_x, train_y, test_x, test_y, input_shape=(4, 54, 54), filter_n1=64, filter_size1=6,
-           filter_n2=64, filter_size2=6, pool_size1=3, pool_size2=2, filter_drop1=0.25, filter_drop2=0.25,
+def do_cnn(train_x, train_y, test_x, test_y, input_shape=(4, 54, 54), filter_n1=64, filter_size1=6, filter_stride1=2,
+           border_mode1='same', filter_n2=64, filter_size2=6, filter_stride2=2, border_mode2='same', pool_size1=3,
+           pool_size2=2, filter_drop1=0.25, filter_drop2=0.25,
            dense_n1=512, dense_drop1=0.5, dense_n2=256, dense_drop2=0.5, batch_size=128, nb_epoch=5):
     print("Building a ConvNet model...")
     model = Sequential()
 
     # input: 54x54 images with 4 tels -> (4, 54, 54) tensors.
     # this applies 64 convolution filters of size 6x6 each.
-    model.add(Convolution2D(filter_n1, filter_size1, filter_size1, border_mode='valid', input_shape=input_shape))
+    model.add(Convolution2D(filter_n1, filter_size1, filter_size1, subsample=(filter_stride1, filter_stride1),
+                            border_mode=border_mode1, input_shape=input_shape))
     model.add(Activation('relu'))
-    model.add(Convolution2D(filter_n1, filter_size1, filter_size1))
+    model.add(Convolution2D(filter_n1, filter_size1, filter_size1, subsample=(filter_stride1, filter_stride1), border_mode=border_mode1))
     model.add(Activation('relu'))
-    model.add(MaxPooling2D(pool_size=(pool_size1, pool_size1)))
+    model.add(MaxPooling2D(pool_size=(pool_size1, pool_size1), border_mode='valid'))
     model.add(Dropout(filter_drop1))
 
-    model.add(Convolution2D(filter_n2, filter_size2, filter_size2, border_mode='valid'))
+    model.add(Convolution2D(filter_n2, filter_size2, filter_size2, subsample=(filter_stride2, filter_stride2), border_mode=border_mode2))
     model.add(Activation('relu'))
-    model.add(Convolution2D(filter_n2, filter_size2, filter_size2))
+    model.add(Convolution2D(filter_n2, filter_size2, filter_size2, subsample=(filter_stride2, filter_stride2), border_mode=border_mode2))
     model.add(Activation('relu'))
-    model.add(MaxPooling2D(pool_size=(pool_size2, pool_size2)))
+    model.add(MaxPooling2D(pool_size=(pool_size2, pool_size2), border_mode='valid'))
     model.add(Dropout(filter_drop2))
 
-    model.add(Convolution2D(filter_n2, filter_size2, filter_size2, border_mode='valid'))
+    model.add(Convolution2D(filter_n2, filter_size2, filter_size2, subsample=(filter_stride2, filter_stride2), border_mode=border_mode2))
     model.add(Activation('relu'))
-    model.add(Convolution2D(filter_n2, filter_size2, filter_size2))
+    model.add(Convolution2D(filter_n2, filter_size2, filter_size2, subsample=(filter_stride2, filter_stride2), border_mode=border_mode2))
     model.add(Activation('relu'))
-    model.add(MaxPooling2D(pool_size=(pool_size2, pool_size2)))
+    model.add(MaxPooling2D(pool_size=(pool_size2, pool_size2), border_mode='valid'))
     model.add(Dropout(filter_drop2))
 
 
@@ -76,27 +79,29 @@ def do_cnn(train_x, train_y, test_x, test_y, input_shape=(4, 54, 54), filter_n1=
     fpr_test, tpr_test, thresh_test = roc_curve(test_y,predict_test_y)
     roc_auc_test = auc(fpr_test, tpr_test)
     print 'The training AUC score is {0}, and the test AUC score is: {1}'.format(roc_auc, roc_auc_test)
+    print 'The mean prediction for training data is {0}, and for test data is: {1}'.format(np.mean(predict_train_y), np.mean(predict_test_y))
 
     return model, m_history
 
-def do_cnn_one_tel(train_x, train_y, test_x, test_y, input_shape=(1, 54, 54), filter_n1=64, filter_size1=6,
-           filter_n2=64, filter_size2=6, pool_size1=3, pool_size2=2, filter_drop1=0.25, filter_drop2=0.25,
+def do_cnn_one_tel(train_x, train_y, test_x, test_y, input_shape=(1, 54, 54), filter_n1=64, filter_size1=6, filter_stride1=2,
+           filter_n2=64, filter_size2=6, filter_stride2=2, pool_size1=3, pool_size2=2, filter_drop1=0.25, filter_drop2=0.25,
            dense_n1=512, dense_drop1=0.5, dense_n2=256, dense_drop2=0.5, batch_size=128, nb_epoch=5):
     print("Building a ConvNet model...")
     model = Sequential()
 
     # input: 54x54 images with 1 tel -> (1, 54, 54) tensors.
     # this applies 64 convolution filters of size 6x6 each.
-    model.add(Convolution2D(filter_n1, filter_size1, filter_size1, border_mode='valid', input_shape=input_shape))
+    model.add(Convolution2D(filter_n1, filter_size1, filter_size1, border_mode='valid',
+                            subsample=(filter_stride1, filter_stride1), input_shape=input_shape))
     model.add(Activation('relu'))
-    model.add(Convolution2D(filter_n1, filter_size1, filter_size1))
+    model.add(Convolution2D(filter_n1, filter_size1, filter_size1, subsample=(filter_stride1, filter_stride1)))
     model.add(Activation('relu'))
     model.add(MaxPooling2D(pool_size=(pool_size1, pool_size1)))
     model.add(Dropout(filter_drop1))
 
-    model.add(Convolution2D(filter_n2, filter_size2, filter_size2, border_mode='valid'))
+    model.add(Convolution2D(filter_n2, filter_size2, filter_size2, border_mode='valid', subsample=(filter_stride2, filter_stride2)))
     model.add(Activation('relu'))
-    model.add(Convolution2D(filter_n2, filter_size2, filter_size2))
+    model.add(Convolution2D(filter_n2, filter_size2, filter_size2, subsample=(filter_stride2, filter_stride2)))
     model.add(Activation('relu'))
     model.add(MaxPooling2D(pool_size=(pool_size2, pool_size2)))
     model.add(Dropout(filter_drop2))
@@ -164,3 +169,10 @@ def concat_data(train_x1, train_y1, test_x1, test_y1, train_x2, train_y2, test_x
     test_y = np.concatenate((test_y1, test_y2), axis=0)
     return train_x, train_y, test_x, test_y
 
+def split_train_test(x, y, ratio=0.2, random_state=1234):
+    sss = StratifiedShuffleSplit(y, test_size=ratio, random_state=random_state)
+    for train_index, test_index in sss:
+        break
+    train_x, train_y = x[train_index], y[train_index]
+    test_x, test_y = x[test_index], y[test_index]
+    return train_x, train_y, test_x, test_y

@@ -158,3 +158,7 @@ def load_pickle(f):
     return loaded
 
 
+def dump_pickle(a, f):
+    output = open(f, 'wb')
+    pickle.dump(a, output, protocol=pickle.HIGHEST_PROTOCOL)
+    output.close()
