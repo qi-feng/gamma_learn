@@ -295,8 +295,8 @@ class PyVAPlotSquareCam:
         numX = int((np.max(self.pos)-np.min(self.pos))/self.size+1*rate)
         #print numX
         #self.z = np.random.rand(numX, numX)
-        #self.z = np.zeros((numX, numX))
-        self.z = -np.ones((numX, numX))
+        self.z = np.zeros((numX, numX))
+        #self.z = -np.ones((numX, numX))
         #self.zpix = np.zeros((numX, numX))
         self.x = self.pos[:,0]/np.sqrt(2.)*rate
         self.y = self.pos[:,1]/np.sqrt(2.)*rate
@@ -466,7 +466,9 @@ class PyVAPlotSquareCam:
 
 
 def quick_oversample2(pixVals, z_index, numX=54):
-    z = -np.ones((numX, numX))
+    #z = -np.ones((numX, numX))
+    z = np.zeros((numX, numX))
+
     for i_ in range(len(pixVals)):
         x_ = int(z_index.at[i_, 'x1'])
         y_ = int(z_index.at[i_,'y1'])

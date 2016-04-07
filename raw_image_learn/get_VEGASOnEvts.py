@@ -75,7 +75,8 @@ def read_st2_charge(f, tels=[0,1,2,3]):
                     print("Can't get charge from tel %d, channel %d, sample %d" % (tel, chan, sample))
 
 def quick_oversample2(pixVals, z_index, numX=54):
-    z = -np.ones((numX, numX))
+    #z = -np.ones((numX, numX))
+    z = np.zeros((numX, numX))
     for i_ in range(len(pixVals)):
         x_ = int(z_index.at[i_, 'x1'])
         y_ = int(z_index.at[i_,'y1'])

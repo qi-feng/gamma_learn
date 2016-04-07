@@ -6,7 +6,8 @@ from itertools import islice
 from sklearn.cross_validation import StratifiedShuffleSplit
 
 def quick_oversample2(pixVals, z_index, numX=54):
-    z = -np.ones((numX, numX))
+    #z = -np.ones((numX, numX))
+    z = np.zeros((numX, numX))
     for i_ in range(len(pixVals)):
         x_ = int(z_index.at[i_, 'x1'])
         y_ = int(z_index.at[i_,'y1'])
