@@ -14,6 +14,8 @@ import numpy as np
 from sklearn.cross_validation import StratifiedShuffleSplit
 from keras.callbacks import ModelCheckpoint, EarlyStopping
 from keras import backend as K
+from keras.models import model_from_json
+
 import matplotlib.pyplot as plt
 import os
 
@@ -97,8 +99,8 @@ def do_cnn(train_x, train_y, test_x, test_y, input_shape=(4, 54, 54), nb_classes
     if test_y.dtype != 'float32':
         test_y = test_y.astype('float32')
 
-    train_x /= norm_x
-    test_x /= norm_x
+    train_x = train_x / norm_x
+    test_x = test_x / norm_x
 
     print("Training the ConvNet model...")
 
@@ -127,32 +129,60 @@ def do_cnn(train_x, train_y, test_x, test_y, input_shape=(4, 54, 54), nb_classes
 def search_cnn(train_x, train_y, test_x, test_y, input_shape=(4, 54, 54), nb_classes=2, loss_func='binary_crossentropy',
            filter_n1s=[16,32], filter_size1s=[8,10,12,14], filter_stride1=1, border_mode1='valid', pool_size1s=[2,], filter_drop1=0.5,
            filter_n2s=[16,32], filter_size2s=[3,4], filter_stride2=1, border_mode2='same', pool_size2=2, filter_drop2=0.5,
-           dense_n1=256, dense_drop1=0.5, dense_n2=64, dense_drop2=0.5, batch_sizes=[64,128], nb_epoch=50, norm_xs=[10.],
-           lr=0.01, early_stop=10):
+           dense_n1=256, dense_drop1=0.5, dense_n2=64, dense_drop2=0.5, batch_sizes=[64,128], nb_epoch=50, norm_x=10.,
+           lr=0.01, early_stop=10, log_file="search_gamma_cnn.log"):
 
     print("Grid searching the parameter space of a ConvNet model...")
     scores = {}
+    if log_file is not None:
+        flog = open(log_file, 'w+')
+
+    if len(train_y.shape)==1:
+        #add a new axis to y
+        train_y = np_utils.to_categorical(train_y, nb_classes)
+
+    if len(test_y.shape)==1:
+        #add a new axis to y
+        test_y = np_utils.to_categorical(test_y, nb_classes)
+
+    if train_x.dtype != 'float32':
+        train_x = train_x.astype('float32')
+    if train_y.dtype != 'float32':
+        train_y = train_y.astype('float32')
+    if test_x.dtype != 'float32':
+        test_x = test_x.astype('float32')
+    if test_y.dtype != 'float32':
+        test_y = test_y.astype('float32')
+
+    #normalize x only once:
+    train_x = train_x / norm_x
+    test_x = test_x / norm_x
+
     for filter_n1 in filter_n1s:
         for filter_size1 in filter_size1s:
             for pool_size1 in pool_size1s:
                 for filter_n2 in filter_n2s:
                     for filter_size2 in filter_size2s:
                         for batch_size in batch_sizes:
-                            for norm_x in norm_xs:
-                                weights_file= "sim+CR_filter1n%ds%dp%d_filter2n%ds%dp%d_batch%d_norm%.1f_best_weights.hdf5" % (filter_n1, filter_size1, pool_size1, filter_n2, filter_size2, pool_size2, batch_size, norm_x)
-                                model, m_history = do_cnn(train_x, train_y, test_x, test_y, input_shape=input_shape, nb_classes=nb_classes, loss_func=loss_func,
-                                       filter_n1=filter_n1, filter_size1=filter_size1, filter_stride1=filter_stride1, border_mode1=border_mode1,
-                                       pool_size1=pool_size1, filter_drop1=filter_drop1,
-                                       filter_n2=filter_n2, filter_size2=filter_size2, filter_stride2=filter_stride2, border_mode2=border_mode2,
-                                       pool_size2=pool_size2, filter_drop2=filter_drop2,
-                                       dense_n1=dense_n1, dense_drop1=dense_drop1, dense_n2=dense_n2, dense_drop2=dense_drop2,
-                                       batch_size=batch_size, nb_epoch=nb_epoch, norm_x=norm_x,
-                                       lr=lr, early_stop=early_stop, weights_file= weights_file)
-                                score = model.evaluate(test_x, test_y, batch_size=batch_size, show_accuracy=True, verbose=1)
-                                scores["sim+CR_filter1n%ds%dp%d_filter2n%ds%dp%d_batch%d_norm%.1f" % \
-                                       (filter_n1, filter_size1, pool_size1, filter_n2, filter_size2, pool_size2, batch_size, norm_x)] = score
-                                print score
-    print scores
+                            weights_file= "sim+CR_filter1n%ds%dp%d_filter2n%ds%dp%d_batch%d_norm%.1f_best_weights.hdf5" % (filter_n1, filter_size1, pool_size1, filter_n2, filter_size2, pool_size2, batch_size, norm_x)
+                            model, m_history = do_cnn(train_x, train_y, test_x, test_y, input_shape=input_shape, nb_classes=nb_classes, loss_func=loss_func,
+                                   filter_n1=filter_n1, filter_size1=filter_size1, filter_stride1=filter_stride1, border_mode1=border_mode1,
+                                   pool_size1=pool_size1, filter_drop1=filter_drop1,
+                                   filter_n2=filter_n2, filter_size2=filter_size2, filter_stride2=filter_stride2, border_mode2=border_mode2,
+                                   pool_size2=pool_size2, filter_drop2=filter_drop2,
+                                   dense_n1=dense_n1, dense_drop1=dense_drop1, dense_n2=dense_n2, dense_drop2=dense_drop2,
+                                   batch_size=batch_size, nb_epoch=nb_epoch, norm_x=1.,
+                                   lr=lr, early_stop=early_stop, weights_file= weights_file)
+                            score = model.evaluate(test_x, test_y, batch_size=batch_size, show_accuracy=True, verbose=1)
+                            scores["sim+CR_filter1n%ds%dp%d_filter2n%ds%dp%d_batch%d_norm%.1f" % \
+                                   (filter_n1, filter_size1, pool_size1, filter_n2, filter_size2, pool_size2, batch_size, norm_x)] = score
+                            #print score
+                            if log_file is not None:
+                                flog.write("sim+CR_filter1n%ds%dp%d_filter2n%ds%dp%d_batch%d_norm%.1f score = %.4f accuracy = %.4f" % \
+                                   (filter_n1, filter_size1, pool_size1, filter_n2, filter_size2, pool_size2, batch_size, norm_x, score[0], score[1]))
+    if log_file is not None:
+        flog.close()
+    print(scores)
     return scores
 
 def view_layer(model, layer_num, data_entry, subplot_rows=4, subplot_cols=8, figsize=(12,6), cmap=plt.cm.CMRmap, filename=None):
@@ -210,3 +240,32 @@ def split_train_test(x, y, ratio=0.2, random_state=1234):
     train_x, train_y = x[train_index], y[train_index]
     test_x, test_y = x[test_index], y[test_index]
     return train_x.astype('float32'), train_y.astype('float32'), test_x.astype('float32'), test_y.astype('float32')
+
+
+# save model:
+def save_keras_model(model, filename, weight_file):
+    """
+    :param model:
+    :param filename: e.g. 'model_sim5_moreData_architecture.json'
+    :param weight_file: e.g. 'model_sim5_moreData_weights.h5'
+    :return:
+    """
+    json_string = model.to_json()
+    open(filename, 'w').write(json_string)
+    model.save_weights(weight_file)
+
+
+# load model:
+def load_keras_model(filename, weight_file):
+    """
+    :param filename: see above
+    :param weight_file: see above
+    :return: keras model obj
+    """
+    model = model_from_json(open(filename).read())
+    model.load_weights(weight_file)
+    return model
+
+
+
+

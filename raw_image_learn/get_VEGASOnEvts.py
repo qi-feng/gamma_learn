@@ -6,6 +6,8 @@ import cPickle as pickle
 import numpy as np
 import pandas as pd
 from get_raw_features import *
+import matplotlib.pyplot as plt
+from matplotlib.colors import LogNorm
 
 try:
     ROOT.gSystem.Load("$VEGAS/common/lib/libSP24sharedLite.so")
@@ -184,3 +186,64 @@ def dump_neighbor_pixels(outf):
     df.to_csv(outf, index=False)
 
 
+def read_st4_evt_coord(f, tels=[0,1,2,3], start_event=None, stop_event=None, evtlist=None, outfile=None):
+    io = ROOT.VARootIO(f, 1)
+    showerTree = io.loadTheShowerEventTree()
+    showerEvtData = ROOT.VAShowerData()
+    showerTree.SetBranchAddress("S", showerEvtData)
+
+    paramTree = io.loadTheParameterisedEventTree()
+    paramEvtData = ROOT.VAParameterisedEventData()
+    paramTree.SetBranchAddress("P", paramEvtData)
+    #calibTree.SetBranchAddress("C", calibEvtData)
+
+    #evtNum = []
+    if start_event is None:
+        start_event=0
+    if stop_event is None and evtlist is None:
+        totalEvtNum = paramTree.GetEntries()
+        print "You want to get coordinates of all events."
+    elif evtlist is None:
+        assert start_event<stop_event, "Please specify sensible start_event and stop_event numbers. "
+        totalEvtNum = stop_event+1-start_event
+        evtlist = range(start_event, stop_event+1)
+    else:
+        totalEvtNum = len(evtlist)
+
+    print("Processing %d events." % totalEvtNum)
+
+    try:
+        allCoords = np.zeros((totalEvtNum, 2)) #first [0] RA then [1] DEC
+    except MemoryError:
+        print("Such a large number of events caused a MemoryError... "
+              "Let's try passing start_event and stop_event or evtlist to analyze a smaller set of events.")
+        raise
+
+    ReconstructedEvents = []
+    for evt_count, evt in enumerate(evtlist):
+        try:
+            #paramTree.GetEntry(evt)
+            showerTree.GetEntry(evt)
+        except:
+            print("Can't get calibrated event number %d" % evt)
+        #evtNum.append(int(calibEvtData.fArrayEventNum))
+        #for telID in tels:
+        try:
+            #allCoords[evt_count] = (paramEvtData.vfTels.at(telID).pfHillasData.fOriginRA, paramEvtData.vfTels.at(telID).pfHillasData.fOriginDec)
+            allCoords[evt_count] = (showerEvtData.fDirectionRA_J2000_Rad, showerEvtData.fDirectionDec_J2000_Rad)
+            if showerEvtData.fIsReconstructed:
+                ReconstructedEvents.append(evt)
+        except:
+            print "Event ", evt, " failed to get coordinates "
+            allCoords[evt_count]=(0., 0.)
+    if outfile is not None:
+        output = open(outfile, 'wb')
+        pickle.dump(allCoords, output)
+        output.close()
+        #pd.DataFrame(allCharge).to_csv(outfile, index=False, header=None)
+    return allCoords
+
+def view_raw_skymap(allCoords, evtlist):
+    plt.hist2d(allCoords[:,0][np.where(allCoords[:,0]>0)], allCoords[:,1][np.where(allCoords[:,1]>0)], bins=40, norm=LogNorm())
+    plt.colorbar()
+    plt.show()
