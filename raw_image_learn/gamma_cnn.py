@@ -22,6 +22,7 @@ import os
 def do_cnn(train_x, train_y, test_x, test_y, input_shape=(4, 54, 54), nb_classes=2, loss_func='binary_crossentropy',
            filter_n1=32, filter_size1=6, filter_stride1=2, border_mode1='valid', pool_size1=2, filter_drop1=0.25,
            filter_n2=32, filter_size2=3, filter_stride2=1, border_mode2='same', pool_size2=2, filter_drop2=0.25,
+           filter_n3=32, filter_size3=3, filter_stride3=1, border_mode3='same', pool_size3=2, filter_drop3=0.25,
            dense_n1=256, dense_drop1=0.5, dense_n2=64, dense_drop2=0.5, batch_size=128, nb_epoch=5, norm_x=1.,
            lr=0.01, early_stop=10, weights_file= 'mnist_best_weights.hdf5'):
 
@@ -46,12 +47,13 @@ def do_cnn(train_x, train_y, test_x, test_y, input_shape=(4, 54, 54), nb_classes
     model.add(MaxPooling2D(pool_size=(pool_size2, pool_size2), border_mode='valid'))
     model.add(Dropout(filter_drop2))
 
-    #model.add(Convolution2D(filter_n2, filter_size2, filter_size2, subsample=(filter_stride2, filter_stride2), border_mode=border_mode2))
-    #model.add(Activation('relu'))
-    #model.add(Convolution2D(filter_n2, filter_size2, filter_size2, subsample=(filter_stride2, filter_stride2), border_mode=border_mode2))
-    #model.add(Activation('relu'))
-    #model.add(MaxPooling2D(pool_size=(pool_size2, pool_size2), border_mode='valid'))
-    #model.add(Dropout(filter_drop2))
+    if filter_n3>0:
+        model.add(Convolution2D(filter_n3, filter_size3, filter_size3, subsample=(filter_stride3, filter_stride3), border_mode=border_mode3))
+        model.add(Activation('relu'))
+        model.add(Convolution2D(filter_n3, filter_size3, filter_size3, subsample=(filter_stride3, filter_stride3), border_mode=border_mode3))
+        model.add(Activation('relu'))
+        model.add(MaxPooling2D(pool_size=(pool_size3, pool_size3), border_mode='valid'))
+        model.add(Dropout(filter_drop3))
 
 
     model.add(Flatten())
@@ -60,10 +62,11 @@ def do_cnn(train_x, train_y, test_x, test_y, input_shape=(4, 54, 54), nb_classes
     model.add(Activation('relu'))
     model.add(Dropout(dense_drop1))
 
-    model.add(Dense(dense_n2))
-    #model.add(Activation('relu'))
-    model.add(Activation('tanh'))
-    model.add(Dropout(dense_drop2))
+    if dense_n2>0:
+        model.add(Dense(dense_n2))
+        #model.add(Activation('relu'))
+        model.add(Activation('tanh'))
+        model.add(Dropout(dense_drop2))
 
     model.add(Dense(nb_classes))
 
@@ -267,5 +270,17 @@ def load_keras_model(filename, weight_file):
     return model
 
 
+def predict_stats(model, test_x, norm=255.):
+    pred_ = model.predict_proba(test_x/norm)
+    print "The mean predictions are", np.mean(pred_, axis=0)
+    print "The std dev of the predictions are", np.std(pred_, axis=0)
 
+def clean_negative(x, y=None):
+    x_positve = x[np.where(np.mean(x, axis=(1,2,3))>0)].astype('float32')
+    x_positve[np.where(x_positve<0)] = 0
+    if y is not None:
+        assert x.shape[0] == y.shape[0], "Please provide the same number of x and y entries."
+        y_positve = y[np.where(np.mean(x, axis=(1,2,3))>0)].astype('float32')
+        return x_positve, y_positve
+    return x_positve
 
