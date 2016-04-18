@@ -85,7 +85,7 @@ def quick_oversample2(pixVals, z_index, numX=54):
         z[x_:x_+2, y_:y_+2] = pixVals[i_]
     return z
 
-def read_st2_calib_charge(f, tels=[0,1,2,3], maskL2=True,
+def read_st2_calib_charge(f, tels=[0,1,2,3], maskL2=True, getEvtNumber=False,
                           l2channels=[[110, 249, 255, 404, 475], [128, 173, 259, 498, 499], [37, 159, 319, 451, 499], [99, 214, 333, 499]],
                           start_event=None, stop_event=None, evtlist=None, outfile=None):
     calib_io = ROOT.VARootIO(f, 1)
@@ -112,6 +112,8 @@ def read_st2_calib_charge(f, tels=[0,1,2,3], maskL2=True,
     try:
         allCharge = np.zeros((4, 500, totalEvtNum))
         oversampledCharge = np.zeros((totalEvtNum, 4, 54, 54))
+        if getEvtNumber:
+            evtNums = np.zeros(totalEvtNum)
     except MemoryError:
         print("Such a large number of events caused a MemoryError... "
               "Let's try passing start_event and stop_event or evtlist to analyze a smaller set of events.")
@@ -153,11 +155,19 @@ def read_st2_calib_charge(f, tels=[0,1,2,3], maskL2=True,
             except:
                 print "tel ", telID, "chan ",chanID, " event ", evt, " failed to get charge "
                 allCharge[telID][chanID][evt_count]=0.
+        if getEvtNumber:
+            evtNums[evt_count] = calibEvtData.fArrayEventNum
     if outfile is not None:
         output = open(outfile, 'wb')
         pickle.dump(oversampledCharge, output)
         output.close()
+        if getEvtNumber:
+            output = open("ArrayEvtNum"+outfile, 'wb')
+            pickle.dump(evtNums, output)
+            output.close()
         #pd.DataFrame(allCharge).to_csv(outfile, index=False, header=None)
+    if getEvtNumber:
+        return oversampledCharge, evtNums
     return oversampledCharge
 
 def mask_L2_channels_square(x, l2channels=[[110, 249, 255, 404, 475], [128, 173, 259, 498], [37, 159, 319, 451, 499], [99, 214, 333, 499]]):
@@ -243,7 +253,8 @@ def read_st4_evt_coord(f, tels=[0,1,2,3], start_event=None, stop_event=None, evt
         #pd.DataFrame(allCharge).to_csv(outfile, index=False, header=None)
     return allCoords
 
-def read_st4_evt_params(f, tels=[0,1,2,3], start_event=None, stop_event=None, evtlist=None, outfile=None, getCoordinates=False):
+def read_st4_evt_params(f, tels=[0,1,2,3], start_event=None, stop_event=None, evtlist=None, outfile=None,
+                        isEnergy=True, getCoordinates=False):
     io = ROOT.VARootIO(f, 1)
     showerTree = io.loadTheShowerEventTree()
     showerEvtData = ROOT.VAShowerData()
@@ -253,6 +264,10 @@ def read_st4_evt_params(f, tels=[0,1,2,3], start_event=None, stop_event=None, ev
     #paramEvtData = ROOT.VAParameterisedEventData()
     #paramTree.SetBranchAddress("P", paramEvtData)
     #calibTree.SetBranchAddress("C", calibEvtData)
+
+    rh = io.loadTheRunHeader()
+    sourceRA = rh.getSourceRA()
+    sourceDec = rh.getSourceDec()
 
     #evtNum = []
     if start_event is None:
@@ -294,8 +309,10 @@ def read_st4_evt_params(f, tels=[0,1,2,3], start_event=None, stop_event=None, ev
             if showerEvtData.fEnergy_GeV > 0:
                 Erms_over_E = showerEvtData.fEnergyRMS_GeV/showerEvtData.fEnergy_GeV
             else:
-                #continue
-                Erms_over_E = 2.
+                if isEnergy:
+                    continue
+                else:
+                    Erms_over_E = 2.
             allParams[evt_count] = (showerEvtData.fMSW, showerEvtData.fMSL, showerEvtData.fMSW_RMS,
                                     showerEvtData.fMSL_RMS, showerEvtData.fShowerMaxHeight_KM,
                                     Erms_over_E)
@@ -316,8 +333,13 @@ def read_st4_evt_params(f, tels=[0,1,2,3], start_event=None, stop_event=None, ev
         output = open("ArrayEvtNum_"+outfile, 'wb')
         pickle.dump(allParams, output)
         output.close()
-
+        if getCoordinates:
+            output = open("Coordinates_"+outfile, 'wb')
+            pickle.dump(allCoords, output)
+            output.close()
         #pd.DataFrame(allCharge).to_csv(outfile, index=False, header=None)
+    if getCoordinates:
+        return allParams, evtNums, allCoords
     return allParams, evtNums
 
 
