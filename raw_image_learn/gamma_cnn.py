@@ -34,20 +34,21 @@ def do_cnn(train_x, train_y, test_x, test_y, input_shape=(4, 54, 54), nb_classes
     model.add(Convolution2D(filter_n1, filter_size1, filter_size1, subsample=(filter_stride1, filter_stride1),
                             border_mode=border_mode1, input_shape=input_shape))
     model.add(Activation('relu'))
-    #model.add(Convolution2D(filter_n1, filter_size1, filter_size1, subsample=(filter_stride1, filter_stride1), border_mode=border_mode1))
-    model.add(Convolution2D(filter_n2, filter_size2, filter_size2, subsample=(filter_stride2, filter_stride2), border_mode=border_mode2))
+    model.add(Convolution2D(filter_n1, filter_size1, filter_size1, subsample=(filter_stride1, filter_stride1), border_mode=border_mode1))
+    #model.add(Convolution2D(filter_n2, filter_size2, filter_size2, subsample=(filter_stride2, filter_stride2), border_mode=border_mode2))
     model.add(Activation('relu'))
     model.add(MaxPooling2D(pool_size=(pool_size1, pool_size1), border_mode='valid'))
     model.add(Dropout(filter_drop1))
 
-    model.add(Convolution2D(filter_n2, filter_size2, filter_size2, subsample=(filter_stride2, filter_stride2), border_mode=border_mode2))
-    model.add(Activation('relu'))
-    model.add(Convolution2D(filter_n2, filter_size2, filter_size2, subsample=(filter_stride2, filter_stride2), border_mode=border_mode2))
-    model.add(Activation('relu'))
-    model.add(MaxPooling2D(pool_size=(pool_size2, pool_size2), border_mode='valid'))
-    model.add(Dropout(filter_drop2))
+    if filter_n2>0:
+        model.add(Convolution2D(filter_n2, filter_size2, filter_size2, subsample=(filter_stride2, filter_stride2), border_mode=border_mode2))
+        model.add(Activation('relu'))
+        model.add(Convolution2D(filter_n2, filter_size2, filter_size2, subsample=(filter_stride2, filter_stride2), border_mode=border_mode2))
+        model.add(Activation('relu'))
+        model.add(MaxPooling2D(pool_size=(pool_size2, pool_size2), border_mode='valid'))
+        model.add(Dropout(filter_drop2))
 
-    if filter_n3>0:
+    if filter_n2>0 and filter_n3>0:
         model.add(Convolution2D(filter_n3, filter_size3, filter_size3, subsample=(filter_stride3, filter_stride3), border_mode=border_mode3))
         model.add(Activation('relu'))
         model.add(Convolution2D(filter_n3, filter_size3, filter_size3, subsample=(filter_stride3, filter_stride3), border_mode=border_mode3))

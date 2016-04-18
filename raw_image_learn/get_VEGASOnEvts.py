@@ -243,6 +243,84 @@ def read_st4_evt_coord(f, tels=[0,1,2,3], start_event=None, stop_event=None, evt
         #pd.DataFrame(allCharge).to_csv(outfile, index=False, header=None)
     return allCoords
 
+def read_st4_evt_params(f, tels=[0,1,2,3], start_event=None, stop_event=None, evtlist=None, outfile=None, getCoordinates=False):
+    io = ROOT.VARootIO(f, 1)
+    showerTree = io.loadTheShowerEventTree()
+    showerEvtData = ROOT.VAShowerData()
+    showerTree.SetBranchAddress("S", showerEvtData)
+
+    #paramTree = io.loadTheParameterisedEventTree()
+    #paramEvtData = ROOT.VAParameterisedEventData()
+    #paramTree.SetBranchAddress("P", paramEvtData)
+    #calibTree.SetBranchAddress("C", calibEvtData)
+
+    #evtNum = []
+    if start_event is None:
+        start_event=0
+    if stop_event is None and evtlist is None:
+        totalEvtNum = showerTree.GetEntries()
+        print "You want to get coordinates of all events."
+    elif evtlist is None:
+        assert start_event<stop_event, "Please specify sensible start_event and stop_event numbers. "
+        totalEvtNum = stop_event+1-start_event
+        evtlist = range(start_event, stop_event+1)
+    else:
+        totalEvtNum = len(evtlist)
+
+    print("Processing %d events." % totalEvtNum)
+
+    try:
+        #Parameters of interest are: S.fMSW, S.fMSL, S.fMSW_RMS, S.fMSL_RMS, S.fShowerMaxHeight_KM, S.fEnergyRMS_GeV/S.fEnergy_GeV
+        #maybes: impact distance (S.fCoreXEastMirrPlane_M, fCoreYNorthMirrPlane_M), S.fShowerMaxHeight_RMS_KM
+        allParams = np.zeros((totalEvtNum, 6))
+        evtNums = np.zeros(totalEvtNum)
+        if getCoordinates:
+            allCoords = np.zeros((totalEvtNum, 2)) #first [0] RA then [1] DEC
+    except MemoryError:
+        print("Such a large number of events caused a MemoryError... "
+              "Let's try passing start_event and stop_event or evtlist to analyze a smaller set of events.")
+        raise
+
+    ReconstructedEvents = []
+    for evt_count, evt in enumerate(evtlist):
+        try:
+            #paramTree.GetEntry(evt)
+            showerTree.GetEntry(evt)
+        except:
+            print("Can't get calibrated event number %d" % evt)
+        #evtNum.append(int(calibEvtData.fArrayEventNum))
+        #for telID in tels:
+        try:
+            if showerEvtData.fEnergy_GeV > 0:
+                Erms_over_E = showerEvtData.fEnergyRMS_GeV/showerEvtData.fEnergy_GeV
+            else:
+                #continue
+                Erms_over_E = 2.
+            allParams[evt_count] = (showerEvtData.fMSW, showerEvtData.fMSL, showerEvtData.fMSW_RMS,
+                                    showerEvtData.fMSL_RMS, showerEvtData.fShowerMaxHeight_KM,
+                                    Erms_over_E)
+            evtNums[evt_count] = showerEvtData.fArrayEventNum
+            if getCoordinates:
+                allCoords[evt_count] = (showerEvtData.fDirectionRA_J2000_Rad, showerEvtData.fDirectionDec_J2000_Rad)
+            if showerEvtData.fIsReconstructed:
+                ReconstructedEvents.append(evt)
+        except:
+            print "Event ", evt, "ArrayEvtNum ", showerEvtData.fArrayEventNum, " failed to get params "
+            allParams[evt_count] = 0.
+            if getCoordinates:
+                allCoords[evt_count]=(0., 0.)
+    if outfile is not None:
+        output = open(outfile, 'wb')
+        pickle.dump(allParams, output)
+        output.close()
+        output = open("ArrayEvtNum_"+outfile, 'wb')
+        pickle.dump(allParams, output)
+        output.close()
+
+        #pd.DataFrame(allCharge).to_csv(outfile, index=False, header=None)
+    return allParams, evtNums
+
+
 def view_raw_skymap(allCoords, evtlist):
     plt.hist2d(allCoords[:,0][np.where(allCoords[:,0]>0)], allCoords[:,1][np.where(allCoords[:,1]>0)], bins=40, norm=LogNorm())
     plt.colorbar()
