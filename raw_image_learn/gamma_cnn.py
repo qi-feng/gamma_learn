@@ -3,7 +3,7 @@ __author__ = 'qfeng'
 
 from keras.models import Sequential
 from keras.layers.core import Dense, Dropout, Activation, Flatten
-from keras.layers.convolutional import Convolution2D, MaxPooling2D
+from keras.layers.convolutional import Convolution2D, MaxPooling2D, AveragePooling2D
 from keras.optimizers import SGD
 #from keras.layers.normalization import BatchNormalization
 #from keras.layers.advanced_activations import PReLU
@@ -24,7 +24,7 @@ def do_cnn(train_x, train_y, test_x, test_y, input_shape=(4, 54, 54), nb_classes
            filter_n2=32, filter_size2=3, filter_stride2=1, border_mode2='same', pool_size2=2, filter_drop2=0.25,
            filter_n3=32, filter_size3=3, filter_stride3=1, border_mode3='same', pool_size3=2, filter_drop3=0.25,
            dense_n1=256, dense_drop1=0.5, dense_n2=64, dense_drop2=0.5, batch_size=128, nb_epoch=5, norm_x=1.,
-           lr=0.01, early_stop=10, weights_file= 'mnist_best_weights.hdf5'):
+           lr=0.01, early_stop=10, weights_file= 'mnist_best_weights.hdf5', pool_method="avg"):
 
     print("Building a ConvNet model...")
     model = Sequential()
@@ -37,7 +37,10 @@ def do_cnn(train_x, train_y, test_x, test_y, input_shape=(4, 54, 54), nb_classes
     model.add(Convolution2D(filter_n1, filter_size1, filter_size1, subsample=(filter_stride1, filter_stride1), border_mode=border_mode1))
     #model.add(Convolution2D(filter_n2, filter_size2, filter_size2, subsample=(filter_stride2, filter_stride2), border_mode=border_mode2))
     model.add(Activation('relu'))
-    model.add(MaxPooling2D(pool_size=(pool_size1, pool_size1), border_mode='valid'))
+    if pool_method=="Max" or pool_method=="MaxPooling" or pool_method=="max":
+        model.add(MaxPooling2D(pool_size=(pool_size1, pool_size1), border_mode='valid'))
+    elif pool_method=="Avg" or pool_method=="avg" or pool_method=="average" or pool_method=="Average":
+        model.add(AveragePooling2D(pool_size=(pool_size1, pool_size1), border_mode='valid'))
     model.add(Dropout(filter_drop1))
 
     if filter_n2>0:
@@ -45,7 +48,10 @@ def do_cnn(train_x, train_y, test_x, test_y, input_shape=(4, 54, 54), nb_classes
         model.add(Activation('relu'))
         model.add(Convolution2D(filter_n2, filter_size2, filter_size2, subsample=(filter_stride2, filter_stride2), border_mode=border_mode2))
         model.add(Activation('relu'))
-        model.add(MaxPooling2D(pool_size=(pool_size2, pool_size2), border_mode='valid'))
+        if pool_method=="Max" or pool_method=="MaxPooling" or pool_method=="max":
+            model.add(MaxPooling2D(pool_size=(pool_size2, pool_size2), border_mode='valid'))
+        elif pool_method=="Avg" or pool_method=="avg" or pool_method=="average" or pool_method=="Average":
+            model.add(AveragePooling2D(pool_size=(pool_size2, pool_size2), border_mode='valid'))
         model.add(Dropout(filter_drop2))
 
     if filter_n2>0 and filter_n3>0:
@@ -53,7 +59,10 @@ def do_cnn(train_x, train_y, test_x, test_y, input_shape=(4, 54, 54), nb_classes
         model.add(Activation('relu'))
         model.add(Convolution2D(filter_n3, filter_size3, filter_size3, subsample=(filter_stride3, filter_stride3), border_mode=border_mode3))
         model.add(Activation('relu'))
-        model.add(MaxPooling2D(pool_size=(pool_size3, pool_size3), border_mode='valid'))
+        if pool_method=="Max" or pool_method=="MaxPooling" or pool_method=="max":
+            model.add(MaxPooling2D(pool_size=(pool_size3, pool_size3), border_mode='valid'))
+        elif pool_method=="Avg" or pool_method=="avg" or pool_method=="average" or pool_method=="Average":
+            model.add(AveragePooling2D(pool_size=(pool_size3, pool_size3), border_mode='valid'))
         model.add(Dropout(filter_drop3))
 
 

@@ -196,7 +196,7 @@ def dump_neighbor_pixels(outf):
     df.to_csv(outf, index=False)
 
 
-def read_st4_evt_coord(f, tels=[0,1,2,3], start_event=None, stop_event=None, evtlist=None, outfile=None):
+def read_st4_evt_coord(f, tels=[0,1,2,3], start_event=None, stop_event=None, evtlist=None, outfile=None, getEventNumbers=True):
     io = ROOT.VARootIO(f, 1)
     showerTree = io.loadTheShowerEventTree()
     showerEvtData = ROOT.VAShowerData()
@@ -235,7 +235,7 @@ def read_st4_evt_coord(f, tels=[0,1,2,3], start_event=None, stop_event=None, evt
             #paramTree.GetEntry(evt)
             showerTree.GetEntry(evt)
         except:
-            print("Can't get calibrated event number %d" % evt)
+            print("Can't get shower tree event number %d" % evt)
         #evtNum.append(int(calibEvtData.fArrayEventNum))
         #for telID in tels:
         try:
@@ -251,10 +251,12 @@ def read_st4_evt_coord(f, tels=[0,1,2,3], start_event=None, stop_event=None, evt
         pickle.dump(allCoords, output)
         output.close()
         #pd.DataFrame(allCharge).to_csv(outfile, index=False, header=None)
+    #if getEventNumbers:
+    #    return allCoords, evtNums
     return allCoords
 
 def read_st4_evt_params(f, tels=[0,1,2,3], start_event=None, stop_event=None, evtlist=None, outfile=None,
-                        isEnergy=True, getCoordinates=False):
+                        isEnergy=True, getCoordinates=False, getParams=True, getEventNumbers=True, return_nonZero=False):
     io = ROOT.VARootIO(f, 1)
     showerTree = io.loadTheShowerEventTree()
     showerEvtData = ROOT.VAShowerData()
@@ -287,8 +289,10 @@ def read_st4_evt_params(f, tels=[0,1,2,3], start_event=None, stop_event=None, ev
     try:
         #Parameters of interest are: S.fMSW, S.fMSL, S.fMSW_RMS, S.fMSL_RMS, S.fShowerMaxHeight_KM, S.fEnergyRMS_GeV/S.fEnergy_GeV
         #maybes: impact distance (S.fCoreXEastMirrPlane_M, fCoreYNorthMirrPlane_M), S.fShowerMaxHeight_RMS_KM
-        allParams = np.zeros((totalEvtNum, 6))
-        evtNums = np.zeros(totalEvtNum)
+        if getParams:
+            allParams = np.zeros((totalEvtNum, 6))
+        if getEventNumbers:
+            evtNums = np.zeros(totalEvtNum)
         if getCoordinates:
             allCoords = np.zeros((totalEvtNum, 2)) #first [0] RA then [1] DEC
     except MemoryError:
@@ -302,7 +306,7 @@ def read_st4_evt_params(f, tels=[0,1,2,3], start_event=None, stop_event=None, ev
             #paramTree.GetEntry(evt)
             showerTree.GetEntry(evt)
         except:
-            print("Can't get calibrated event number %d" % evt)
+            print("Can't get shower tree event number %d" % evt)
         #evtNum.append(int(calibEvtData.fArrayEventNum))
         #for telID in tels:
         try:
@@ -313,35 +317,64 @@ def read_st4_evt_params(f, tels=[0,1,2,3], start_event=None, stop_event=None, ev
                     continue
                 else:
                     Erms_over_E = 2.
-            allParams[evt_count] = (showerEvtData.fMSW, showerEvtData.fMSL, showerEvtData.fMSW_RMS,
+            if getParams:
+                allParams[evt_count] = (showerEvtData.fMSW, showerEvtData.fMSL, showerEvtData.fMSW_RMS,
                                     showerEvtData.fMSL_RMS, showerEvtData.fShowerMaxHeight_KM,
                                     Erms_over_E)
-            evtNums[evt_count] = showerEvtData.fArrayEventNum
+            if getEventNumbers:
+                evtNums[evt_count] = showerEvtData.fArrayEventNum
             if getCoordinates:
                 allCoords[evt_count] = (showerEvtData.fDirectionRA_J2000_Rad, showerEvtData.fDirectionDec_J2000_Rad)
             if showerEvtData.fIsReconstructed:
                 ReconstructedEvents.append(evt)
         except:
             print "Event ", evt, "ArrayEvtNum ", showerEvtData.fArrayEventNum, " failed to get params "
-            allParams[evt_count] = 0.
+            if getParams:
+                allParams[evt_count] = 0.
             if getCoordinates:
                 allCoords[evt_count]=(0., 0.)
+    if return_nonZero:
+        if getParams:
+            allParams = allParams[np.where(evtNums!=0)]
+        if getEventNumbers:
+            evtNums = evtNums[np.where(evtNums!=0)]
+        if getCoordinates:
+            allCoords = allCoords[np.where(evtNums!=0)]
+
     if outfile is not None:
-        output = open(outfile, 'wb')
-        pickle.dump(allParams, output)
-        output.close()
-        output = open("ArrayEvtNum_"+outfile, 'wb')
-        pickle.dump(allParams, output)
-        output.close()
+        if getParams:
+            output = open(outfile, 'wb')
+            pickle.dump(allParams, output)
+            output.close()
+        if getEventNumbers:
+            output = open("ArrayEvtNum_"+outfile, 'wb')
+            pickle.dump(allParams, output)
+            output.close()
         if getCoordinates:
             output = open("Coordinates_"+outfile, 'wb')
             pickle.dump(allCoords, output)
             output.close()
         #pd.DataFrame(allCharge).to_csv(outfile, index=False, header=None)
-    if getCoordinates:
-        return allParams, evtNums, allCoords
-    return allParams, evtNums
+    if getParams and not getEventNumbers and not getCoordinates:
+        return allParams
+    elif getParams and getEventNumbers and not getCoordinates:
+        return allParams, evtNums
+    elif getParams and not getEventNumbers and getCoordinates:
+        return allParams, allCoords
+    elif not getParams and not getEventNumbers and getCoordinates:
+        return allCoords
+    elif not getParams and getEventNumbers and not getCoordinates:
+        return evtNums
+    elif not getParams and getEventNumbers and getCoordinates:
+        return evtNums, allCoords
 
+
+def read_st4_sourceCoord(f):
+    io = ROOT.VARootIO(f, 1)
+    rh = io.loadTheRunHeader()
+    sourceRA = rh.getSourceRA()
+    sourceDec = rh.getSourceDec()
+    return  sourceRA, sourceDec
 
 def view_raw_skymap(allCoords, evtlist):
     plt.hist2d(allCoords[:,0][np.where(allCoords[:,0]>0)], allCoords[:,1][np.where(allCoords[:,1]>0)], bins=40, norm=LogNorm())
