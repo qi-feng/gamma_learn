@@ -86,7 +86,7 @@ def quick_oversample2(pixVals, z_index, numX=54):
     return z
 
 def read_st2_calib_charge(f, tels=[0,1,2,3], maskL2=True, getEvtNumber=False,
-                          l2channels=[[110, 249, 255, 404, 475], [128, 173, 259, 498, 499], [37, 159, 319, 451, 499], [99, 214, 333, 499]],
+                          l2channels=[[110, 249, 255, 404, 475, 499], [128, 173, 259, 498, 499], [37, 159, 319, 451, 499], [99, 214, 333, 499]],
                           start_event=None, stop_event=None, evtlist=None, outfile=None):
     calib_io = ROOT.VARootIO(f, 1)
     calibTree = calib_io.loadTheCalibratedEventTree()
@@ -170,7 +170,7 @@ def read_st2_calib_charge(f, tels=[0,1,2,3], maskL2=True, getEvtNumber=False,
         return oversampledCharge, evtNums
     return oversampledCharge
 
-def mask_L2_channels_square(x, l2channels=[[110, 249, 255, 404, 475], [128, 173, 259, 498], [37, 159, 319, 451, 499], [99, 214, 333, 499]]):
+def mask_L2_channels_square(x, l2channels=[[110, 249, 255, 404, 475, 499], [128, 173, 259, 498], [37, 159, 319, 451, 499], [99, 214, 333, 499]]):
     assert len(x.shape)==4, "Expected a four dimension input features"
     z_index = pd.read_csv("oversample_coordinates.csv")
     z_index = z_index.drop(['x2', 'y2'], axis=1)
