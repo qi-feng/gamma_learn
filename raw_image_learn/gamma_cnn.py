@@ -431,7 +431,6 @@ class cnn(object):
         return model, m_history
 
 
-
 class cnn_regressor(cnn):
     def do_cnn_regression(self,
                input_shape=(4, 54, 54), loss_func='mse',
@@ -495,7 +494,7 @@ class cnn_regressor(cnn):
 
         if dense_n2>0:
             model.add(Dense(dense_n2))
-            #model.add(Activation('relu'))
+            model.add(Activation('relu'))
             #model.add(Activation('tanh'))
             model.add(Dropout(dense_drop2))
 
@@ -539,7 +538,6 @@ class cnn_regressor(cnn):
         self.model = model
         self.m_history = m_history
         return model, m_history
-
 
 
 def view_layer(model, layer_num, data_entry, subplot_rows=4, subplot_cols=8, figsize=(12,6), cmap=plt.cm.CMRmap, filename=None):

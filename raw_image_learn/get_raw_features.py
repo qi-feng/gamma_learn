@@ -16,7 +16,7 @@ def quick_oversample2(pixVals, z_index, numX=54):
 
 def get_raw_features(infile='64080.txt', in_pickle_onfile = 'on0.95_64080.pkl', in_pickle_offfile = 'off0.005_64080.pkl',
                      test_ratio=0.3, random_state=1234, dump=False, maskL2=True,
-                     l2channels=[[110, 249, 255, 404, 475], [128, 173, 259, 498, 499], [37, 159, 319, 451, 499], [99, 214, 333, 499]],
+                     l2channels=[[110, 249, 255, 404, 475, 499], [128, 173, 259, 498, 499], [37, 159, 319, 451, 499], [99, 214, 333, 499]],
                      out_trainx='64080_raw_trainx.pkl', out_trainy='64080_raw_trainy.pkl',
                      out_testx='64080_raw_testx.pkl', out_testy='64080_raw_testy.pkl'):
     inputfile = open(in_pickle_onfile, 'rb')
@@ -106,7 +106,7 @@ def get_raw_features(infile='64080.txt', in_pickle_onfile = 'on0.95_64080.pkl', 
 
 def get_raw_features_on(infile='72044.txt', in_pickle_onfile = 'on72044.pkl', test_ratio=0.3, random_state=1234, 
                         dump=False, out_trainx='72044_raw_trainx_on.pkl', out_trainy='72044_raw_trainy_on.pkl', maskL2=True,
-                        l2channels=[[110, 249, 255, 404, 475], [128, 173, 259, 498, 499], [37, 159, 319, 451, 499], [99, 214, 333, 499]],
+                        l2channels=[[110, 249, 255, 404, 475, 499], [128, 173, 259, 498, 499], [37, 159, 319, 451, 499], [99, 214, 333, 499]],
                         out_testx='72044_raw_testx_on.pkl', out_testy='72044_raw_testy_on.pkl'):
     inputfile = open(in_pickle_onfile, 'rb')
     on = pickle.load(inputfile)
