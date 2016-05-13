@@ -23,6 +23,26 @@ def rad2deg(rad):
 
 
 class Pbh(object):
+    def __init__(self):
+        # the cut on -2lnL, consider smaller values accepted for events coming from the same centroid
+        self.ll_cut = -9.5
+        # set the hard coded PSF width table from the hyperbolic secant function
+        # 4 rows are Energy bins 0.08 to 0.32 TeV (row 0), 0.32 to 0.5 TeV, 0.5 to 1 TeV, and 1 to 50 TeV
+        # 3 columns are Elevation bins 50-70 (column 0), 70-80 80-90 degs
+        self.psf_lookup = np.zeros((4,3))
+        self.E_grid=np.array([0.08, 0.32, 0.5, 1.0, 50.0])
+        self.EL_grid=np.array([50.0, 70.0, 80., 90.])
+        # for later reference
+        #self.E_bins=np.digitize(self.BDT_ErecS, self.E_grid)-1
+        #self.Z_bins=np.digitize((90.-self.BDT_Elevation), self.Zen_grid)-1
+        #  0.08 to 0.32 TeV
+        self.psf_lookup[0,:] = np.array([0.052, 0.051, 0.05])
+        #  0.32 to 0.5 TeV
+        self.psf_lookup[1,:] = np.array([0.047, 0.042, 0.042])
+        #   0.5 to 1 TeV
+        self.psf_lookup[2,:] = np.array([0.041, 0.035, 0.034])
+        #   1 to 50 TeV
+        self.psf_lookup[3,:] = np.array([0.031, 0.028, 0.027])
 
     #This below is not used as we are dealing with stupid root files
     def read_photon_list(self, ts, RAs, Decs, Es, ELs):
@@ -102,15 +122,17 @@ class Pbh(object):
     def psf_func(self, theta2, psf_width, N=100):
         return 1.71*N/2./np.pi/psf_width**2/np.cosh(np.sqrt(theta2)/psf_width)
 
-    #place holder
+    #use hard coded width table from the hyperbolic secant function
     def get_psf(self, E=0.1, EL=80):
-        return 0.1
+        E_bin=np.digitize(E, self.E_grid)-1
+        EL_bin=np.digitize(EL, self.EL_grid)-1
+        return self.psf_lookup[E_bin, EL_bin]
 
     def get_psf_lists(self):
         if not hasattr(self, 'photon_df'):
             print "Call get_TreeWithAllGamma first..."
         for i, EL_ in enumerate(self.photon_df.ELs):
-            self.photon_df.psfs[i] = self.get_psf(E=self.photon_df.Es[i], EL=EL_)
+            self.photon_df.psfs.at[i] = self.get_psf(E=self.photon_df.Es[i], EL=EL_)
 
     def get_angular_distance(self, coord1, coord2):
         """
@@ -197,6 +219,7 @@ def test2():
     pbh = Pbh()
     pbh.get_TreeWithAllGamma(runNum=47717)
     print pbh.photon_df.head()
+    return pbh
 
 if __name__ == "__main__":
-    test2()
+    pbh = test2()
