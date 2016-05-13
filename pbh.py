@@ -84,7 +84,7 @@ class Pbh(object):
             #df_.eventNumber[i] = event.eventNumber
             df_.ts[i] = event.timeOfDay
             df_.RAs[i] = event.GammaRA
-            df_.Decs[i] = event.GammaDec
+            df_.Decs[i] = event.GammaDEC
             df_.Es[i] = event.Energy
             df_.ELs[i] = event.TelElevation
 
