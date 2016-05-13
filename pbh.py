@@ -22,7 +22,7 @@ def rad2deg(rad):
     return rad*180./np.pi
 
 
-class pbh(object):
+class Pbh(object):
 
     #This below is not used as we are dealing with stupid root files
     def read_photon_list(self, ts, RAs, Decs, Es, ELs):
@@ -145,7 +145,7 @@ class pbh(object):
         return results.x
 
     def search_angular_window(self):
-        centroid = pbh.minimize_centroid_ll(self.coords, self.photon_df.psfs)
+        centroid = self.minimize_centroid_ll(self.coords, self.photon_df.psfs)
 
     #def search_time_window
 
@@ -177,21 +177,26 @@ class pbh(object):
         ax.set_ylabel("Dec")
         return ax
 
-plt.show()
 
-pbh = pbh()
+def test1():
+    pbh = Pbh()
+    ras = np.random.random(size=10)*2.0+180.
+    decs = np.random.random(size=10)*1.5+30.
+    coords = np.concatenate([ras.reshape(10,1), decs.reshape(10,1)], axis=1)
+    psfs = np.ones(10)*0.1
+    centroid = pbh.minimize_centroid_ll(coords,psfs)
 
-#pbh.plot_theta2()
+    print centroid
+    print centroid.reshape(1,2)[:,0], centroid.reshape(1,2)[:,1]
 
-ras = np.random.random(size=10)*2.0+180.
-decs = np.random.random(size=10)*1.5+30.
-coords = np.concatenate([ras.reshape(10,1), decs.reshape(10,1)], axis=1)
-psfs = np.ones(10)*0.1
-centroid = pbh.minimize_centroid_ll(coords,psfs)
+    ax = pbh.plot_skymap(coords, [0.1]*10, [0.2]*10)
+    pbh.plot_skymap(centroid.reshape(1,2), [0.1], [0.2], ax=ax, color='b')
+    plt.show()
 
-print centroid
-print centroid.reshape(1,2)[:,0], centroid.reshape(1,2)[:,1]
+def test2():
+    pbh = Pbh()
+    pbh.get_TreeWithAllGamma(runNum=47717)
+    print pbh.photon_df.head()
 
-ax = pbh.plot_skymap(coords, [0.1]*10, [0.2]*10)
-pbh.plot_skymap(centroid.reshape(1,2), [0.1], [0.2], ax=ax, color='b')
-plt.show()
+if __name__ == "__main__":
+    test2()
