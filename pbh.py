@@ -247,6 +247,8 @@ class Pbh(object):
         if fov is not None and fov_center is not None:
             circ_fov=plt.Circle(fov_center, radius=fov, color=fov_color, fill=False)
             ax.add_patch(circ_fov)
+            ax.set_xlim(fov_center[0]-fov*1.1, fov_center[0]+fov*1.1)
+            ax.set_ylim(fov_center[1]-fov*1.1, fov_center[1]+fov*1.1)
 
         ax.set_xlabel('RA')
         ax.set_ylabel("Dec")
@@ -308,12 +310,16 @@ def test_psf_func():
     EL = 15
     pl_nu = powerlaw(index, E_min, E_max)
     rand_Es =  pl_nu.random(Nsim)
-    rand_coords = np.zeros((Nsim, 2))
+    rand_bkg_coords = np.zeros((Nsim, 2))
+    rand_sig_coords = np.zeros((Nsim, 2))
     for i in range(Nsim):
         psf_width = pbh.get_psf(rand_Es[i], EL)
-        rand_theta = pbh.gen_one_random_theta(psf_width)
-        rand_coords[i,:] = pbh.gen_one_random_coords(fov_center, rand_theta)
-    pbh.plot_skymap(rand_coords,rand_Es, [EL]*Nsim, fov_center=fov_center)
+        rand_bkg_theta = pbh.gen_one_random_theta(psf_width, prob="uniform", fov=1.75)
+        rand_sig_theta = pbh.gen_one_random_theta(psf_width, prob="psf", fov=1.75)
+        rand_bkg_coords[i,:] = pbh.gen_one_random_coords(fov_center, rand_bkg_theta)
+        rand_sig_coords[i,:] = pbh.gen_one_random_coords(fov_center, rand_sig_theta)
+    ax = pbh.plot_skymap(rand_bkg_coords,rand_Es, [EL]*Nsim, color='b', fov_center=fov_center)
+    pbh.plot_skymap(rand_sig_coords,rand_Es, [EL]*Nsim, color='r', fov_center=fov_center, ax=ax)
     plt.show()
     return pbh
 
