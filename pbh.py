@@ -201,7 +201,7 @@ class Pbh(object):
         dists = self.get_all_angular_distance(coords, cent_coord)
         theta2s = dists**2
         ll = -2.*np.sum(np.log(psfs)) + np.sum(np.log(1./np.cosh(np.sqrt(theta2s)/psfs)))
-        ll += len(theta2s)*np.log(1.71/np.pi)
+        ll += psfs.shape[0]*np.log(1.71/np.pi)
         ll = -2.*ll
         return ll
 
@@ -242,9 +242,16 @@ class Pbh(object):
             fig=plt.figure(figsize=(5,5))
             ax=plt.subplot(111)
         ax.plot(coords[:,0], coords[:,1], color+'.')
+        label_flag=False
         for coor, E_, EL_ in zip(coords, Es, ELs):
-            circ=plt.Circle(coor, radius=self.get_psf(E_, EL_), color=color, fill=False, label=label)
+            if label_flag==False:
+                circ=plt.Circle(coor, radius=self.get_psf(E_, EL_), color=color, fill=False, label=label)
+                label_flag=True
+            else:
+                circ=plt.Circle(coor, radius=self.get_psf(E_, EL_), color=color, fill=False)
             ax.add_patch(circ)
+
+        label_flag=False
         if fov is not None and fov_center is not None:
             circ_fov=plt.Circle(fov_center, radius=fov, color=fov_color, fill=False)
             ax.add_patch(circ_fov)
@@ -339,7 +346,7 @@ def test_psf_func():
     plt.show()
     return pbh
 
-def test_sim_likelihood():
+def test_sim_likelihood(Nsim=1000, N_burst=3):
     pbh = Pbh()
     fov_center = np.array([180., 30.0])
     fov = 1.75
@@ -349,11 +356,11 @@ def test_sim_likelihood():
     E_min = 0.08
     E_max = 50.0
     #Burst size to visualize
-    N_burst = 10
+    #N_burst = 10
     EL = 15
     pl_nu = powerlaw(index, E_min, E_max)
 
-    Nsim = 1000
+    #Nsim = 1000
     ll_bkg_all = np.zeros(Nsim)
     ll_sig_all = np.zeros(Nsim)
 
@@ -378,6 +385,8 @@ def test_sim_likelihood():
 
     plt.hist(ll_sig_all, bins=100, color='r', alpha=0.3)
     plt.hist(ll_bkg_all, bins=100, color='b', alpha=0.3)
+    plt.axvline(x=-9.5, ls="--", lw=0.3)
+    plt.xlabel("Likelihood")
     plt.show()
     return pbh
 
