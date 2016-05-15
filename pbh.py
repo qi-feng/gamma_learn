@@ -236,20 +236,26 @@ class Pbh(object):
         ax.set_ylabel("Count")
         return ax
 
-    def plot_skymap(self, coords, Es, ELs, ax=None, color='r', fov_center=None, fov=1.75, fov_color='gray'):
+    def plot_skymap(self, coords, Es, ELs, ax=None, color='r', fov_center=None, fov=1.75, fov_color='gray',
+                    cent_coords=None, cent_marker='+', cent_radius=0.01, cent_color='b', label=None):
         if ax is None:
             fig=plt.figure(figsize=(5,5))
             ax=plt.subplot(111)
         ax.plot(coords[:,0], coords[:,1], color+'.')
         for coor, E_, EL_ in zip(coords, Es, ELs):
-            circ=plt.Circle(coor, radius=self.get_psf(E_, EL_), color=color, fill=False)
+            circ=plt.Circle(coor, radius=self.get_psf(E_, EL_), color=color, fill=False, label=label)
             ax.add_patch(circ)
         if fov is not None and fov_center is not None:
             circ_fov=plt.Circle(fov_center, radius=fov, color=fov_color, fill=False)
             ax.add_patch(circ_fov)
             ax.set_xlim(fov_center[0]-fov*1.1, fov_center[0]+fov*1.1)
             ax.set_ylim(fov_center[1]-fov*1.1, fov_center[1]+fov*1.1)
+        if cent_coords is not None:
+            #circ_cent=plt.Circle(cent_coords, radius=cent_radius, color=cent_color, fill=False)
+            #ax.add_patch(circ_cent)
+            ax.plot(cent_coords[0], cent_coords[1], marker=cent_marker, ms=0.8, color=color)
 
+        plt.legend(loc='best')
         ax.set_xlabel('RA')
         ax.set_ylabel("Dec")
         return ax
@@ -312,16 +318,69 @@ def test_psf_func():
     rand_Es =  pl_nu.random(Nsim)
     rand_bkg_coords = np.zeros((Nsim, 2))
     rand_sig_coords = np.zeros((Nsim, 2))
+    psfs = np.zeros(Nsim)
+
     for i in range(Nsim):
         psf_width = pbh.get_psf(rand_Es[i], EL)
-        rand_bkg_theta = pbh.gen_one_random_theta(psf_width, prob="uniform", fov=1.75)
-        rand_sig_theta = pbh.gen_one_random_theta(psf_width, prob="psf", fov=1.75)
+        psfs[i] = psf_width
+        rand_bkg_theta = pbh.gen_one_random_theta(psf_width, prob="uniform", fov=fov)
+        rand_sig_theta = pbh.gen_one_random_theta(psf_width, prob="psf", fov=fov)
         rand_bkg_coords[i,:] = pbh.gen_one_random_coords(fov_center, rand_bkg_theta)
         rand_sig_coords[i,:] = pbh.gen_one_random_coords(fov_center, rand_sig_theta)
-    ax = pbh.plot_skymap(rand_bkg_coords,rand_Es, [EL]*Nsim, color='b', fov_center=fov_center)
-    pbh.plot_skymap(rand_sig_coords,rand_Es, [EL]*Nsim, color='r', fov_center=fov_center, ax=ax)
+
+    cent_bkg, ll_bkg = pbh.minimize_centroid_ll(rand_bkg_coords, psfs)
+    cent_sig, ll_sig = pbh.minimize_centroid_ll(rand_sig_coords, psfs)
+
+    ax = pbh.plot_skymap(rand_bkg_coords,rand_Es, [EL]*Nsim, color='b', fov_center=fov_center,
+                         cent_coords=cent_bkg, cent_marker='+', label=("bkg ll=%.2f" % ll_bkg))
+    pbh.plot_skymap(rand_sig_coords,rand_Es, [EL]*Nsim, color='r', fov_center=fov_center, ax=ax,
+                    cent_coords=cent_sig, label=("sig ll=%.2f" % ll_sig))
+
     plt.show()
     return pbh
+
+def test_sim_likelihood():
+    pbh = Pbh()
+    fov_center = np.array([180., 30.0])
+    fov = 1.75
+
+    #spec sim:
+    index = -2.5
+    E_min = 0.08
+    E_max = 50.0
+    #Burst size to visualize
+    N_burst = 10
+    EL = 15
+    pl_nu = powerlaw(index, E_min, E_max)
+
+    Nsim = 1000
+    ll_bkg_all = np.zeros(Nsim)
+    ll_sig_all = np.zeros(Nsim)
+
+    for j in range(Nsim):
+        rand_Es =  pl_nu.random(N_burst)
+        rand_bkg_coords = np.zeros((N_burst, 2))
+        rand_sig_coords = np.zeros((N_burst, 2))
+        psfs = np.zeros(N_burst)
+
+        for i in range(N_burst):
+            psf_width = pbh.get_psf(rand_Es[i], EL)
+            psfs[i] = psf_width
+            rand_bkg_theta = pbh.gen_one_random_theta(psf_width, prob="uniform", fov=fov)
+            rand_sig_theta = pbh.gen_one_random_theta(psf_width, prob="psf", fov=fov)
+            rand_bkg_coords[i,:] = pbh.gen_one_random_coords(fov_center, rand_bkg_theta)
+            rand_sig_coords[i,:] = pbh.gen_one_random_coords(fov_center, rand_sig_theta)
+
+        cent_bkg, ll_bkg = pbh.minimize_centroid_ll(rand_bkg_coords, psfs)
+        cent_sig, ll_sig = pbh.minimize_centroid_ll(rand_sig_coords, psfs)
+        ll_bkg_all[j] = ll_bkg
+        ll_sig_all[j] = ll_sig
+
+    plt.hist(ll_sig_all, bins=100, color='r', alpha=0.3)
+    plt.hist(ll_bkg_all, bins=100, color='b', alpha=0.3)
+    plt.show()
+    return pbh
+
 
 def test1():
     pbh = Pbh()
