@@ -354,11 +354,10 @@ def test_psf_func(Nburst=10, filename=None):
                     cent_coords=cent_sig, label=("sig ll=%.2f" % ll_sig))
     if filename is not None:
         plt.savefig(filename)
-    else:
-        plt.show()
+    plt.show()
     return pbh
 
-def test_sim_likelihood(Nsim=1000, N_burst=3, filename=None):
+def test_sim_likelihood(Nsim=1000, N_burst=3, filename=None, sig_bins=50, bkg_bins=100, ylog=True):
     pbh = Pbh()
     fov_center = np.array([180., 30.0])
     fov = 1.75
@@ -395,15 +394,16 @@ def test_sim_likelihood(Nsim=1000, N_burst=3, filename=None):
         ll_bkg_all[j] = ll_bkg
         ll_sig_all[j] = ll_sig
 
-    plt.hist(ll_sig_all, bins=100, color='r', alpha=0.3, label="Burst size "+str(N_burst)+" signal")
-    plt.hist(ll_bkg_all, bins=100, color='b', alpha=0.3, label="Burst size "+str(N_burst)+" background")
+    plt.hist(ll_sig_all, bins=sig_bins, color='r', alpha=0.3, label="Burst size "+str(N_burst)+" signal")
+    plt.hist(ll_bkg_all, bins=bkg_bins, color='b', alpha=0.3, label="Burst size "+str(N_burst)+" background")
     plt.axvline(x=-9.5, ls="--", lw=0.3)
     plt.legend(loc='best')
     plt.xlabel("Likelihood")
+    if ylog:
+        plt.yscale('log')
     if filename is not None:
         plt.savefig(filename)
-    else:
-        plt.show()
+    plt.show()
     return pbh
 
 
