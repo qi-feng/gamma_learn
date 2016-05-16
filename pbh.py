@@ -179,12 +179,14 @@ class Pbh(object):
         if prob.lower()=="psf" or prob=="hypersec" or prob=="hyper secant":
             #_rand_theta = np.random.random()*fov
             _rand_test_cdf = np.random.random()
-            _theta2s=np.arange(0, fov, 0.01)
+            _thetas=np.arange(0,fov,0.01)
+            _theta2s = _thetas**2
+            #_theta2s=np.arange(0, fov*fov, 0.0001732)
             _cdf = np.cumsum(self.psf_func(_theta2s, psf_width, N=1))
             _cdf = _cdf/np.max(_cdf)
             #y_interp = np.interp(x_interp, x, y)
-            _theta = np.interp(_rand_test_cdf, _cdf, _theta2s)
-            return _theta
+            _theta2 = np.interp(_rand_test_cdf, _cdf, _theta2s)
+            return np.sqrt(_theta2)
         elif prob.lower()=="uniform" or prob=="uni":
             return np.random.random()*fov
         #gauss may have a caveat as this is not important
@@ -320,7 +322,7 @@ class powerlaw:
         return self.ppf(r_uniform)
 
 
-def test_psf_func(Nburst=10, filename=None, cent_ms=1.8, cent_mew=4.0):
+def test_psf_func(Nburst=10, filename=None, cent_ms=8.0, cent_mew=1.8):
     #Nburst: Burst size to visualize
     pbh = Pbh()
     fov_center = np.array([180., 30.0])
@@ -358,6 +360,34 @@ def test_psf_func(Nburst=10, filename=None, cent_ms=1.8, cent_mew=4.0):
         plt.savefig(filename)
     plt.show()
     return pbh
+
+#def test_psf_func_sim(psf_width=0.05, prob="uniform", filename=None):
+def test_psf_func_sim(psf_width=0.05, prob="psf", Nsim=10000, Nbins=40, filename=None):
+    pbh = Pbh()
+    fov = 1.75
+
+    # to store the value of a sim signal!
+    rand_thetas = []
+    for i in range(Nsim):
+        rand_thetas.append(pbh.gen_one_random_theta(psf_width, prob=prob, fov=fov))
+
+    rand_theta2s = np.array(rand_thetas)
+    rand_theta2s = rand_theta2s**2
+
+    theta2s=np.arange(0, fov, 0.01)
+
+    theta2_hist, theta2_bins, _ = plt.hist(rand_theta2s, bins=Nbins, alpha=0.3, label="Monte Carlo")
+    theta2s_analytical = pbh.psf_func(theta2s, psf_width, N=1)
+
+    plt.yscale('log')
+    plt.plot(theta2s, theta2s_analytical/theta2s_analytical[0]*theta2_hist[0], 'r--', label="Hyperbolic secant function")
+    plt.xlim(0,0.5)
+    plt.xlabel(r'$\theta^2$ (deg$^2$)')
+    plt.ylabel("Count")
+    plt.legend(loc='best')
+    if filename is not None:
+        plt.savefig(filename)
+    plt.show()
 
 def test_sim_likelihood(Nsim=1000, N_burst=3, filename=None, sig_bins=50, bkg_bins=100, ylog=True):
     pbh = Pbh()
@@ -425,6 +455,7 @@ def test1():
     pbh.plot_skymap(centroid.reshape(1,2), [0.1], [0.2], ax=ax, color='b', fov_center=fov_center)
     plt.show()
 
+
 def test2():
     pbh = Pbh()
     pbh.get_TreeWithAllGamma(runNum=47717)
@@ -432,4 +463,5 @@ def test2():
     return pbh
 
 if __name__ == "__main__":
-    pbh = test_psf_func()
+    pbh = test_psf_func(Nburst=10, filename=None)
+    #pbh = test_psf_func_sim(psf_width=0.05, Nsim=10000, filename=None)
