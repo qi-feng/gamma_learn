@@ -219,7 +219,18 @@ class Pbh(object):
         else:
             return False, False
 
-    #def search_time_window
+    def search_time_window(self, ts=None, RAs=None, Decs=None, Es=None, ELs=None):
+        if ts is not None:
+            assert RAs is not None
+            assert Decs is not None
+            assert Es is not None
+            assert ELs is not None
+        else:
+            ts = self.photon_df.ts
+            RAs = self.photon_df.RAs
+            Decs = self.photon_df.Decs
+            Es = self.photon_df.Es
+            ELs = self.photon_df.ELs
 
 
     def plot_theta2(self, theta2s=np.arange(0, 2, 0.01), psf_width=0.1, N=100, const=1, ax=None, ylog=True):
