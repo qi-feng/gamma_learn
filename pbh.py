@@ -248,7 +248,7 @@ class Pbh(object):
         return ax
 
     def plot_skymap(self, coords, Es, ELs, ax=None, color='r', fov_center=None, fov=1.75, fov_color='gray',
-                    cent_coords=None, cent_marker='+', cent_ms=1.8, cent_radius=0.01, cent_color='b', label=None):
+                    cent_coords=None, cent_marker='+', cent_ms=1.8, cent_mew=4.0, cent_radius=0.01, cent_color='b', label=None):
         if ax is None:
             fig=plt.figure(figsize=(5,5))
             ax=plt.subplot(111)
@@ -271,7 +271,7 @@ class Pbh(object):
         if cent_coords is not None:
             #circ_cent=plt.Circle(cent_coords, radius=cent_radius, color=cent_color, fill=False)
             #ax.add_patch(circ_cent)
-            ax.plot(cent_coords[0], cent_coords[1], marker=cent_marker, ms=cent_ms, color=color)
+            ax.plot(cent_coords[0], cent_coords[1], marker=cent_marker, ms=cent_ms, markeredgewidth=cent_mew, color=color)
 
         plt.legend(loc='best')
         ax.set_xlabel('RA')
@@ -320,7 +320,7 @@ class powerlaw:
         return self.ppf(r_uniform)
 
 
-def test_psf_func(Nburst=10, filename=None, cent_ms=1.8):
+def test_psf_func(Nburst=10, filename=None, cent_ms=1.8, cent_mew=4.0):
     #Nburst: Burst size to visualize
     pbh = Pbh()
     fov_center = np.array([180., 30.0])
@@ -349,9 +349,11 @@ def test_psf_func(Nburst=10, filename=None, cent_ms=1.8):
     cent_sig, ll_sig = pbh.minimize_centroid_ll(rand_sig_coords, psfs)
 
     ax = pbh.plot_skymap(rand_bkg_coords,rand_Es, [EL]*Nburst, color='b', fov_center=fov_center,
-                         cent_coords=cent_bkg, cent_marker='+', cent_ms=cent_ms, label=("bkg ll=%.2f" % ll_bkg))
+                         cent_coords=cent_bkg, cent_marker='+', cent_ms=cent_ms, cent_mew=cent_mew,
+                         label=("bkg ll=%.2f" % ll_bkg))
     pbh.plot_skymap(rand_sig_coords,rand_Es, [EL]*Nburst, color='r', fov_center=fov_center, ax=ax,
-                    cent_coords=cent_sig, cent_ms=cent_ms, label=("sig ll=%.2f" % ll_sig))
+                    cent_coords=cent_sig, cent_ms=cent_ms, cent_mew=cent_mew,
+                    label=("sig ll=%.2f" % ll_sig))
     if filename is not None:
         plt.savefig(filename)
     plt.show()
