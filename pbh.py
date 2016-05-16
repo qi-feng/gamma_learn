@@ -320,7 +320,8 @@ class powerlaw:
         return self.ppf(r_uniform)
 
 
-def test_psf_func():
+def test_psf_func(Nburst=10, filename=None):
+    #Nburst: Burst size to visualize
     pbh = Pbh()
     fov_center = np.array([180., 30.0])
     fov = 1.75
@@ -329,16 +330,14 @@ def test_psf_func():
     index = -2.5
     E_min = 0.08
     E_max = 50.0
-    #Burst size to visualize
-    Nsim = 10
     EL = 15
     pl_nu = powerlaw(index, E_min, E_max)
-    rand_Es =  pl_nu.random(Nsim)
-    rand_bkg_coords = np.zeros((Nsim, 2))
-    rand_sig_coords = np.zeros((Nsim, 2))
-    psfs = np.zeros(Nsim)
+    rand_Es =  pl_nu.random(Nburst)
+    rand_bkg_coords = np.zeros((Nburst, 2))
+    rand_sig_coords = np.zeros((Nburst, 2))
+    psfs = np.zeros(Nburst)
 
-    for i in range(Nsim):
+    for i in range(Nburst):
         psf_width = pbh.get_psf(rand_Es[i], EL)
         psfs[i] = psf_width
         rand_bkg_theta = pbh.gen_one_random_theta(psf_width, prob="uniform", fov=fov)
@@ -349,15 +348,17 @@ def test_psf_func():
     cent_bkg, ll_bkg = pbh.minimize_centroid_ll(rand_bkg_coords, psfs)
     cent_sig, ll_sig = pbh.minimize_centroid_ll(rand_sig_coords, psfs)
 
-    ax = pbh.plot_skymap(rand_bkg_coords,rand_Es, [EL]*Nsim, color='b', fov_center=fov_center,
+    ax = pbh.plot_skymap(rand_bkg_coords,rand_Es, [EL]*Nburst, color='b', fov_center=fov_center,
                          cent_coords=cent_bkg, cent_marker='+', label=("bkg ll=%.2f" % ll_bkg))
-    pbh.plot_skymap(rand_sig_coords,rand_Es, [EL]*Nsim, color='r', fov_center=fov_center, ax=ax,
+    pbh.plot_skymap(rand_sig_coords,rand_Es, [EL]*Nburst, color='r', fov_center=fov_center, ax=ax,
                     cent_coords=cent_sig, label=("sig ll=%.2f" % ll_sig))
-
-    plt.show()
+    if filename is not None:
+        plt.savefig(filename)
+    else:
+        plt.show()
     return pbh
 
-def test_sim_likelihood(Nsim=1000, N_burst=3):
+def test_sim_likelihood(Nsim=1000, N_burst=3, filename=None):
     pbh = Pbh()
     fov_center = np.array([180., 30.0])
     fov = 1.75
@@ -394,11 +395,15 @@ def test_sim_likelihood(Nsim=1000, N_burst=3):
         ll_bkg_all[j] = ll_bkg
         ll_sig_all[j] = ll_sig
 
-    plt.hist(ll_sig_all, bins=100, color='r', alpha=0.3)
-    plt.hist(ll_bkg_all, bins=100, color='b', alpha=0.3)
+    plt.hist(ll_sig_all, bins=100, color='r', alpha=0.3, label="Burst size "+str(N_burst)+" signal")
+    plt.hist(ll_bkg_all, bins=100, color='b', alpha=0.3, label="Burst size "+str(N_burst)+" background")
     plt.axvline(x=-9.5, ls="--", lw=0.3)
+    plt.legend(loc='best')
     plt.xlabel("Likelihood")
-    plt.show()
+    if filename is not None:
+        plt.savefig(filename)
+    else:
+        plt.show()
     return pbh
 
 
