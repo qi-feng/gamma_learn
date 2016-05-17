@@ -44,12 +44,11 @@ class Pbh(object):
         #   1 to 50 TeV
         self.psf_lookup[3,:] = np.array([0.031, 0.028, 0.027])
 
-    #This below is not used as we are dealing with stupid root files
     def read_photon_list(self, ts, RAs, Decs, Es, ELs):
         N_ = len(ts)
         assert N_==len(RAs) and N_==len(Decs) and N_==len(Es) and N_==len(ELs), \
             "Make sure input lists (ts, RAs, Decs, Es, ELs) are of the same dimension"
-        columns=['MJDs', 'ts', 'RAs', 'Decs', 'Es', 'ELs', 'coords', 'psfs']
+        columns=['MJDs', 'ts', 'RAs', 'Decs', 'Es', 'ELs', 'coords', 'psfs', 'burst_sizes']
         df_ = pd.DataFrame(np.array([np.zeros(N_)]*len(columns)).T,
                       columns=columns)
         df_.ts = ts
@@ -59,6 +58,7 @@ class Pbh(object):
         df_.ELs = ELs
         df_.coords = np.concatenate([df_.RAs.reshape(N_,1), df_.Decs.reshape(N_,1)], axis=1)
         df_.psfs = np.zeros(N_)
+        df_.burst_sizes = np.zeros(N_)
         self.photon_df = df_
         self.photon_df.psfs = self.get_psf_lists()
 
@@ -93,7 +93,7 @@ class Pbh(object):
         #    ptTime.append(ptd.Time);
         #ptTime=np.array(ptTime)
         #columns=['runNumber','eventNumber', 'MJD', 'Time', 'Elevation', ]
-        columns=['MJDs', 'ts', 'RAs', 'Decs', 'Es', 'ELs', 'coords', 'psfs']
+        columns=['MJDs', 'ts', 'RAs', 'Decs', 'Es', 'ELs', 'coords', 'psfs', 'burst_sizes']
         N_ = all_gamma_tree.GetEntries()
         df_ = pd.DataFrame(np.array([np.zeros(N_)]*len(columns)).T,
                            columns=columns)
@@ -110,6 +110,7 @@ class Pbh(object):
 
         df_.coords = np.concatenate([df_.RAs.reshape(N_,1), df_.Decs.reshape(N_,1)], axis=1)
         df_.psfs = np.zeros(N_)
+        df_.burst_sizes = np.zeros(N_)
         self.photon_df = df_
         self.photon_df.psfs = self.get_psf_lists()
 
@@ -182,7 +183,8 @@ class Pbh(object):
             _thetas=np.arange(0,fov,0.01)
             _theta2s = _thetas**2
             #_theta2s=np.arange(0, fov*fov, 0.0001732)
-            _cdf = np.cumsum(self.psf_func(_theta2s, psf_width, N=1))
+            _psf_pdf = self.psf_func(_theta2s, psf_width, N=1)
+            _cdf = np.cumsum(_psf_pdf-np.min(_psf_pdf))
             _cdf = _cdf/np.max(_cdf)
             #y_interp = np.interp(x_interp, x, y)
             _theta2 = np.interp(_rand_test_cdf, _cdf, _theta2s)
@@ -205,7 +207,9 @@ class Pbh(object):
         ll = -2.*np.sum(np.log(psfs)) + np.sum(np.log(1./np.cosh(np.sqrt(theta2s)/psfs)))
         ll += psfs.shape[0]*np.log(1.71/np.pi)
         ll = -2.*ll
-        return ll
+        #return ll
+        #Normalized by the number of events!
+        return ll/psfs.shape[0]
 
     def minimize_centroid_ll(self, coords, psfs):
         init_centroid = np.mean(coords, axis=0)
@@ -215,24 +219,60 @@ class Pbh(object):
         return centroid, ll_centroid
 
     def search_angular_window(self, coords, psfs):
+        # Determine if N_evt = coords.shape[0] events are accepted to come from one direction
+        # return centroid, likelihood, and a 1-d array of burst sizes assigned to the events
+        if coords.shape[0]==1:
+            #one event:
+            return coords, 1, np.array([1])
         centroid, ll_centroid = self.minimize_centroid_ll(coords, psfs)
         if ll_centroid < self.ll_cut:
-            return centroid, ll_centroid
+            # all coords.shape[0] events are of a burst size coords.shape[0]
+            return centroid, ll_centroid, np.array([coords.shape[0]]*coords.shape[0])
         else:
-            return False, False
+            # if not accepted, find the worst offender and
+            # return the better N_evt-1 events and the outlier event
+            dists = self.get_all_angular_distance(coords, centroid)
+            outlier_index = np.argmax(dists)
+            mask = np.ones(coords.shape[0], dtype=bool)
+            mask[outlier_index] = False
+            #better_coords, better_psfs, outlier_coords, outlier_psfs = coords[mask,:], psfs[mask],\
+            #                                                           coords[outlier_index,:], psfs[outlier_index]
 
-    def search_time_window(self, ts=None, RAs=None, Decs=None, Es=None, ELs=None):
+            #better_centroid, better_ll_centroid, better_burst_sizes = self.search_angular_window(better_coords, better_psfs)
+
+            return centroid, ll_centroid, coords[mask,:], psfs[mask], coords[outlier_index,:], psfs[outlier_index]
+
+    def search_time_window(self, window_size=1, ts=None, RAs=None, Decs=None, Es=None, ELs=None):
+        # window_size is in the unit of second
         if ts is not None:
             assert RAs is not None
             assert Decs is not None
             assert Es is not None
             assert ELs is not None
+            if hasattr(self, 'photon_df'):
+                print "A new list is provided now, gonna read it into photon_df"
+            self.read_photon_list(ts, RAs, Decs, Es, ELs)
         else:
-            ts = self.photon_df.ts
-            RAs = self.photon_df.RAs
-            Decs = self.photon_df.Decs
-            Es = self.photon_df.Es
-            ELs = self.photon_df.ELs
+            assert hasattr(self, 'photon_df'), "photon_df doesn't exist, read data first (read_photon_list or get_TreeWithAllGamma)"
+
+        # Master event loop:
+        for t in self.photon_df.ts:
+            slice_index = np.where((self.photon_df.ts>=t) & (self.photon_df.ts<(t+window_size)))
+            _N = self.photon_df.ts[slice_index].shape[0]
+            outlier_coords = []
+            outlier_psfs = []
+
+            ang_search_res = self.search_angular_window(self.photon_df.coords[slice_index], self.photon_df.psfs[slice_index])
+            if len(ang_search_res)==3:
+                centroid, ll_centroid, burst_sizes = ang_search_res
+                self.photon_df.burst_sizes[slice_index] = burst_sizes
+            else:
+                better_centroid, better_ll_centroid, better_coords, better_psfs, _outlier_coords, _outlier_psfs = ang_search_res
+                outlier_coords.append(_outlier_coords)
+                outlier_psfs.append(_outlier_psfs)
+                ang_search_res = self.search_angular_window(better_coords, better_psfs)
+
+
 
 
     def plot_theta2(self, theta2s=np.arange(0, 2, 0.01), psf_width=0.1, N=100, const=1, ax=None, ylog=True):
@@ -361,8 +401,9 @@ def test_psf_func(Nburst=10, filename=None, cent_ms=8.0, cent_mew=1.8):
     plt.show()
     return pbh
 
-#def test_psf_func_sim(psf_width=0.05, prob="uniform", filename=None):
-def test_psf_func_sim(psf_width=0.05, prob="psf", Nsim=10000, Nbins=40, filename=None):
+#def test_psf_func_sim(psf_width=0.05, prob="uniform", Nsim=10000, Nbins=40, filename=None, xlim=None):
+def test_psf_func_sim(psf_width=0.05, prob="psf", Nsim=10000, Nbins=40, filename=None, xlim=(0,0.5)):
+#def test_psf_func_sim(psf_width=0.05, prob="psf", Nsim=10000, Nbins=40, filename=None, xlim=None):
     pbh = Pbh()
     fov = 1.75
 
@@ -374,14 +415,14 @@ def test_psf_func_sim(psf_width=0.05, prob="psf", Nsim=10000, Nbins=40, filename
     rand_theta2s = np.array(rand_thetas)
     rand_theta2s = rand_theta2s**2
 
-    theta2s=np.arange(0, fov, 0.01)
+    theta2s=np.arange(0, fov, 0.01)**2
 
     theta2_hist, theta2_bins, _ = plt.hist(rand_theta2s, bins=Nbins, alpha=0.3, label="Monte Carlo")
     theta2s_analytical = pbh.psf_func(theta2s, psf_width, N=1)
 
     plt.yscale('log')
     plt.plot(theta2s, theta2s_analytical/theta2s_analytical[0]*theta2_hist[0], 'r--', label="Hyperbolic secant function")
-    plt.xlim(0,0.5)
+    plt.xlim(xlim)
     plt.xlabel(r'$\theta^2$ (deg$^2$)')
     plt.ylabel("Count")
     plt.legend(loc='best')
@@ -463,5 +504,8 @@ def test2():
     return pbh
 
 if __name__ == "__main__":
-    pbh = test_psf_func(Nburst=10, filename=None)
-    #pbh = test_psf_func_sim(psf_width=0.05, Nsim=10000, filename=None)
+    #pbh = test_psf_func(Nburst=10, filename=None)
+    pbh = test_psf_func_sim(psf_width=0.05, Nsim=10000, prob="psf", Nbins=40, xlim=(0,0.5),
+                            filename="/Users/qfeng/Data/veritas/pbh/reedbuck_plots/test_sim_psf/sim_psf_theta2hist_hypsec_sig.pdf")
+    #pbh = test_psf_func_sim(psf_width=0.05, prob="uniform", Nsim=10000, Nbins=40, xlim=None,
+    #                        filename="/Users/qfeng/Data/veritas/pbh/reedbuck_plots/test_sim_psf/sim_psf_theta2hist_uniform_bkg.pdf")
