@@ -339,7 +339,7 @@ class Pbh(object):
         :return: indices of events that are in a burst, indices of outliers (None if no outliers);
                  in the process fill self._burst_dict for later burst counting
         """
-        ang_search_res = self.search_angular_window(self.photon_df.coords[slice_index], self.photon_df.psfs[slice_index],
+        ang_search_res = self.search_angular_window(self.photon_df.coords.values[slice_index], self.photon_df.psfs.values[slice_index],
                                                     np.array(slice_index[0]))
         outlier_evts = []
 
