@@ -50,7 +50,7 @@ class Pbh(object):
         N_ = len(ts)
         assert N_==len(RAs) and N_==len(Decs) and N_==len(Es) and N_==len(ELs), \
             "Make sure input lists (ts, RAs, Decs, Es, ELs) are of the same dimension"
-        columns=['MJDs', 'ts', 'RAs', 'Decs', 'Es', 'ELs', 'coords', 'psfs', 'burst_sizes']
+        columns=['MJDs', 'ts', 'RAs', 'Decs', 'Es', 'ELs', 'psfs', 'burst_sizes']
         df_ = pd.DataFrame(np.array([np.zeros(N_)]*len(columns)).T,
                       columns=columns)
         df_.ts = ts
@@ -58,10 +58,13 @@ class Pbh(object):
         df_.Decs = Decs
         df_.Es = Es
         df_.ELs = ELs
-        df_.coords = np.concatenate([df_.RAs.reshape(N_,1), df_.Decs.reshape(N_,1)], axis=1)
+        #df_.coords = np.concatenate([df_.RAs.reshape(N_,1), df_.Decs.reshape(N_,1)], axis=1)
         df_.psfs = np.zeros(N_)
         df_.burst_sizes = np.zeros(N_)
-        self.photon_df = df_
+        #self.photon_df = df_
+        #clean events that did not pass cut:
+        self.photon_df = df_[df_.fail_cut==0]
+
         self.photon_df.psfs = self.get_psf_lists()
 
     def readEDfile(self, runNum=None, filename=None):
@@ -73,7 +76,7 @@ class Pbh(object):
         self.Rfile = ROOT.TFile(self.filename, "read");
 
 
-    def get_TreeWithAllGamma(self, runNum=None):
+    def get_TreeWithAllGamma(self, runNum=None, E_lo_cut=0.08, E_hi_cut=50.0, EL_lo_cut=50.0):
         """
         :param runNum:
         :return: nothing but fills photon_df, except photon_df.burst_sizes
@@ -99,12 +102,21 @@ class Pbh(object):
         #    ptTime.append(ptd.Time);
         #ptTime=np.array(ptTime)
         #columns=['runNumber','eventNumber', 'MJD', 'Time', 'Elevation', ]
-        columns=['MJDs', 'ts', 'RAs', 'Decs', 'Es', 'ELs', 'coords', 'psfs', 'burst_sizes']
+        columns=['MJDs', 'ts', 'RAs', 'Decs', 'Es', 'ELs', 'psfs', 'burst_sizes', 'fail_cut']
         N_ = all_gamma_tree.GetEntries()
         df_ = pd.DataFrame(np.array([np.zeros(N_)]*len(columns)).T,
                            columns=columns)
+        ###QF short breaker:
+        breaker = 0
         for i, event in enumerate(all_gamma_tree):
+            #if breaker >1000:
+            #    break
+            #breaker+=1
             #time_index=np.argmax(ptTime>event.Time)
+            #making cut:
+            if event.Energy<E_lo_cut or event.Energy>E_hi_cut or event.TelElevation<EL_lo_cut:
+                df_.fail_cut.at[i] = 1
+                continue
             # fill the pandas dataframe
             df_.MJDs[i] = event.dayMJD
             #df_.eventNumber[i] = event.eventNumber
@@ -114,11 +126,17 @@ class Pbh(object):
             df_.Es[i] = event.Energy
             df_.ELs[i] = event.TelElevation
 
-        df_.coords = np.concatenate([df_.RAs.reshape(N_,1), df_.Decs.reshape(N_,1)], axis=1)
+        #df_.coords = np.concatenate([df_.RAs.reshape(N_,1), df_.Decs.reshape(N_,1)], axis=1)
         df_.psfs = np.zeros(N_)
         df_.burst_sizes = np.zeros(N_)
-        self.photon_df = df_
+        #self.photon_df = df_
+        #clean events that did not pass cut:
+        self.photon_df = df_[df_.fail_cut==0]
+
         self.photon_df.psfs = self.get_psf_lists()
+        ###QF
+        self.photon_df.head()
+
 
     def scramble(self, copy=False):
         if not hasattr(self, 'photon_df'):
@@ -181,8 +199,12 @@ class Pbh(object):
     def get_psf_lists(self):
         if not hasattr(self, 'photon_df'):
             print "Call get_TreeWithAllGamma first..."
+        ###QF:
+        print "getting psf"
         for i, EL_ in enumerate(self.photon_df.ELs):
+            print self.photon_df.Es[i], EL_
             self.photon_df.psfs.at[i] = self.get_psf(E=self.photon_df.Es[i], EL=EL_)
+            print "PSF,", self.photon_df.psfs.at[i]
 
     def get_angular_distance(self, coord1, coord2):
         """
@@ -339,7 +361,15 @@ class Pbh(object):
         :return: indices of events that are in a burst, indices of outliers (None if no outliers);
                  in the process fill self._burst_dict for later burst counting
         """
-        ang_search_res = self.search_angular_window(self.photon_df.coords.values[slice_index], self.photon_df.psfs.values[slice_index],
+        N_ = self.photon_df.shape[0]
+        ###QF
+        print "Slice"
+        print slice_index, np.array(slice_index[0])
+        print "Coords"
+        print np.concatenate([self.photon_df.RAs.reshape(N_,1), self.photon_df.Decs.reshape(N_,1)], axis=1)
+        print "PSFs"
+        print self.photon_df.psfs.values[slice_index]
+        ang_search_res = self.search_angular_window(np.concatenate([self.photon_df.RAs.reshape(N_,1), self.photon_df.Decs.reshape(N_,1)], axis=1), self.photon_df.psfs.values[slice_index],
                                                     np.array(slice_index[0]))
         outlier_evts = []
 
@@ -357,7 +387,8 @@ class Pbh(object):
             # this loop breaks when a burst is found or only one event is left, in which case return values has a length of 3
                 better_centroid, better_ll_centroid, _better_events, _outlier_events = ang_search_res
                 outlier_evts.append(_outlier_events)
-                ang_search_res = self.search_angular_window(self.photon_df.coords[tuple(_better_events)],
+                better_coords = np.concatenate([self.photon_df.RAs.reshape(N_,1), self.photon_df.Decs.reshape(N_,1)], axis=1)[tuple(_better_events)]
+                ang_search_res = self.search_angular_window(better_coords,
                                                             self.photon_df.psfs[tuple(_better_events)],
                                                             _better_events)
             # Now that while loop broke, we have a good list and a bad list
@@ -656,7 +687,7 @@ def test2():
     return pbh
 
 if __name__ == "__main__":
-    pbh = test_burst_finding(window_size=1, filename="47717.anasum.root")
+    pbh = test_burst_finding(window_size=1, runNum=55480, filename="55480.anasum.root")
     #pbh = test_psf_func(Nburst=10, filename=None)
 
     #pbh = test_psf_func_sim(psf_width=0.05, Nsim=10000, prob="psf", Nbins=40, xlim=(0,0.5),
