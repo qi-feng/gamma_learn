@@ -43,6 +43,8 @@ class Pbh(object):
         self.psf_lookup[2,:] = np.array([0.041, 0.035, 0.034])
         #   1 to 50 TeV
         self.psf_lookup[3,:] = np.array([0.031, 0.028, 0.027])
+        self._burst_dict={} #{"Burst #": [event # in this burst]}, for internal use
+        self.VERITAS_deadtime = 0.33e-3 # 0.33ms
 
     def read_photon_list(self, ts, RAs, Decs, Es, ELs):
         N_ = len(ts)
@@ -72,6 +74,10 @@ class Pbh(object):
 
 
     def get_TreeWithAllGamma(self, runNum=None):
+        """
+        :param runNum:
+        :return: nothing but fills photon_df, except photon_df.burst_sizes
+        """
         if not hasattr(self, 'Rfile'):
             print "No file has been read."
             if runNum is not None:
@@ -114,11 +120,41 @@ class Pbh(object):
         self.photon_df = df_
         self.photon_df.psfs = self.get_psf_lists()
 
-    def scramble(self):
+    def scramble(self, copy=False):
         if not hasattr(self, 'photon_df'):
             print "Call get_TreeWithAllGamma first..."
-        self.ts = random.shuffle(self.ts)
+        if copy:
+            #if you want to keep the original burst_dict, this should only happen at the 1st scramble
+            if not hasattr(self, 'photon_df_orig'):
+                self.photon_df_orig = self.photon_df.copy()
+        self.photon_df.ts = random.shuffle(self.photon_df.ts)
+        return self.photon_df.ts
 
+    def t_rando(self, copy=False):
+        """
+        throw Poisson distr. ts based on the original ts,
+        use 1/delta_t as the expected Poisson rate for each event
+        """
+        if not hasattr(self, 'photon_df'):
+            print "Call get_TreeWithAllGamma first..."
+        if copy:
+            #if you want to keep the original burst_dict, this should only happen at the 1st scramble
+            if not hasattr(self, 'photon_df_orig'):
+                self.photon_df_orig = self.photon_df.copy()
+        delta_ts = np.diff(self.photon_df.ts)
+        for i, _delta_t in enumerate(delta_ts):
+            # draw a rando!
+            _rando_delta_t = np.random.exponential(1./_delta_t)
+            inf_loop_preventer = 0
+            inf_loop_bound = 100
+            while _rando_delta_t < self.VERITAS_deadtime:
+                _rando_delta_t = np.random.exponential(1./_delta_t)
+                inf_loop_preventer += 1
+                if inf_loop_preventer > inf_loop_bound:
+                    print "Tried 100 times and can't draw a rando wait time that's larger than VERITAS deadtime,"
+                    print "you'd better check your time unit or something..."
+            self.photon_df.ts.at[i+1] = self.photon_df.ts[i] + _rando_delta_t
+        return self.photon_df.ts
 
     def psf_func(self, theta2, psf_width, N=100):
         return 1.71*N/2./np.pi/psf_width**2/np.cosh(np.sqrt(theta2)/psf_width)
@@ -218,61 +254,170 @@ class Pbh(object):
         ll_centroid = self.centroid_log_likelihood(centroid, coords, psfs)
         return centroid, ll_centroid
 
-    def search_angular_window(self, coords, psfs):
+    def search_angular_window(self, coords, psfs, slice_index):
         # Determine if N_evt = coords.shape[0] events are accepted to come from one direction
-        # return centroid, likelihood, and a 1-d array of burst sizes assigned to the events
+        # slice_index is the array slice of the input event numbers, used for _burst_dict
+        # return: A) centroid, likelihood, and a list of event numbers associated with this burst,
+        #            given that a burst is found, or the input has only one event
+        #         B) centroid, likelihood, a list of event numbers excluding the outlier, the outlier event number
+        #            given that we reject the hypothesis of a burst
         if coords.shape[0]==1:
             #one event:
             return coords, 1, np.array([1])
         centroid, ll_centroid = self.minimize_centroid_ll(coords, psfs)
-        if ll_centroid < self.ll_cut:
-            # all coords.shape[0] events are of a burst size coords.shape[0]
-            return centroid, ll_centroid, np.array([coords.shape[0]]*coords.shape[0])
+        if ll_centroid <= self.ll_cut:
+            # likelihood passes cut
+            # all events with slice_index form a burst candidate
+            return centroid, ll_centroid, slice_index
         else:
             # if not accepted, find the worst offender and
             # return the better N_evt-1 events and the outlier event
             dists = self.get_all_angular_distance(coords, centroid)
             outlier_index = np.argmax(dists)
-            mask = np.ones(coords.shape[0], dtype=bool)
+            mask = np.ones(len(dists), dtype=bool)
             mask[outlier_index] = False
             #better_coords, better_psfs, outlier_coords, outlier_psfs = coords[mask,:], psfs[mask],\
             #                                                           coords[outlier_index,:], psfs[outlier_index]
 
             #better_centroid, better_ll_centroid, better_burst_sizes = self.search_angular_window(better_coords, better_psfs)
 
-            return centroid, ll_centroid, coords[mask,:], psfs[mask], coords[outlier_index,:], psfs[outlier_index]
+            #return centroid, ll_centroid, coords[mask,:], psfs[mask], coords[outlier_index,:], psfs[outlier_index]
+            return centroid, ll_centroid, slice_index[mask], slice_index[outlier_index]
 
-    def search_time_window(self, window_size=1, ts=None, RAs=None, Decs=None, Es=None, ELs=None):
-        # window_size is in the unit of second
-        if ts is not None:
-            assert RAs is not None
-            assert Decs is not None
-            assert Es is not None
-            assert ELs is not None
-            if hasattr(self, 'photon_df'):
-                print "A new list is provided now, gonna read it into photon_df"
-            self.read_photon_list(ts, RAs, Decs, Es, ELs)
-        else:
-            assert hasattr(self, 'photon_df'), "photon_df doesn't exist, read data first (read_photon_list or get_TreeWithAllGamma)"
+    def search_time_window(self, window_size=1):
+        """
+        :param window_size: in the unit of second
+        :return: burst_hist, in the process 1) fill self._burst_dict, and
+                                            2) fill self.photon_df.burst_sizes through burst counting; and
+                                            3) fill self.photon_df.burst_sizes
+        """
+        assert hasattr(self, 'photon_df'), "photon_df doesn't exist, read data first (read_photon_list or get_TreeWithAllGamma)"
 
         # Master event loop:
         for t in self.photon_df.ts:
             slice_index = np.where((self.photon_df.ts>=t) & (self.photon_df.ts<(t+window_size)))
             _N = self.photon_df.ts[slice_index].shape[0]
-            outlier_coords = []
-            outlier_psfs = []
-
-            ang_search_res = self.search_angular_window(self.photon_df.coords[slice_index], self.photon_df.psfs[slice_index])
-            if len(ang_search_res)==3:
-                centroid, ll_centroid, burst_sizes = ang_search_res
-                self.photon_df.burst_sizes[slice_index] = burst_sizes
+            if _N < 1:
+                print "Should never happen"
+                raise
+            if _N == 1:
+                #a sparse window
+                self.photon_df.burst_size[slice_index] = 1
+                continue
+            burst_events, outlier_events = self.search_event_slice(slice_index)
+            if outlier_events is None:
+                #All events of slice_index form a burst, no outliers
+                continue
+            if len(outlier_events)==1:
+                #A singlet outlier
+                self.photon_df.burst_sizes[outlier_events[0]] = 1
             else:
-                better_centroid, better_ll_centroid, better_coords, better_psfs, _outlier_coords, _outlier_psfs = ang_search_res
-                outlier_coords.append(_outlier_coords)
-                outlier_psfs.append(_outlier_psfs)
-                ang_search_res = self.search_angular_window(better_coords, better_psfs)
+                #If there is a burst of a subset of events, it's been taken care of, now take care of the outlier slice
+                outlier_burst_events, outlier_of_outlier_events = self.search_event_slice(outlier_events)
+
+                while outlier_of_outlier_events is not None:
+                    #loop until no outliers are left unprocessed
+                    if len(outlier_of_outlier_events)==1:
+                        self.photon_df.burst_sizes[outlier_of_outlier_events[0]] = 1
+                        outlier_of_outlier_events=None
+                        break
+                    else:
+                        # more than 1 outliers to process,
+                        # update outlier_of_outlier_events and repeat the while loop
+                        outlier_burst_events, outlier_of_outlier_events = self.search_event_slice(outlier_events)
+        # the end of master event loop, self._burst_dict is filled
+        # now count bursts and fill self.photon_df.burst_sizes:
+        self.burst_counting()
+        burst_hist = self.get_burst_hist()
+        self.sig_burst_hist = burst_hist
+        #return self.photon_df.burst_sizes
+        return burst_hist
+
+    def search_event_slice(self, slice_index):
+        """
+        :param slice_index: indices of the events in photon_df that the burst search is carried out upon
+        :return: indices of events that are in a burst, indices of outliers (None if no outliers);
+                 in the process fill self._burst_dict for later burst counting
+        """
+        ang_search_res = self.search_angular_window(self.photon_df.coords[slice_index], self.photon_df.psfs[slice_index],
+                                                    np.array(slice_index[0]))
+        outlier_evts = []
+
+        if len(ang_search_res)==3:
+            # All events with slice_index form 1 burst
+            centroid, ll_centroid, burst_events = ang_search_res
+            self._burst_dict[len(self._burst_dict)+1]=burst_events
+            #count later
+            #self.photon_df.burst_sizes[slice_index] = len(burst_events)
+            #burst_events should be the same as slice_index
+            return burst_events, None
+        else:
+            while(len(ang_search_res)==4):
+            # returned 4 meaning no bursts, and the input has more than one events, shall continue
+            # this loop breaks when a burst is found or only one event is left, in which case return values has a length of 3
+                better_centroid, better_ll_centroid, _better_events, _outlier_events = ang_search_res
+                outlier_evts.append(_outlier_events)
+                ang_search_res = self.search_angular_window(self.photon_df.coords[tuple(_better_events)],
+                                                            self.photon_df.psfs[tuple(_better_events)],
+                                                            _better_events)
+            # Now that while loop broke, we have a good list and a bad list
+            centroid, ll_centroid, burst_events = ang_search_res
+            if burst_events.shape[0] == 1:
+                # No burst in slice_index found
+                #count later
+                #self.photon_df.burst_sizes[burst_events[0]] = 1
+                return burst_events, outlier_evts
+            else:
+                # A burst with a subset of events of slice_index is found
+                self._burst_dict[len(self._burst_dict)+1]=burst_events
+                #self.photon_df.burst_sizes[tuple(burst_events)] = len(burst_events)
+                return burst_events, outlier_evts
 
 
+    def duplicate_burst_dict(self):
+        #if you want to keep the original burst_dict
+        self.burst_dict = self._burst_dict.copy()
+        return self.burst_dict
+
+    def burst_counting(self):
+        """
+        :return: nothing but fills self.photon_df.burst_sizes
+        """
+        # Only to be called after self._burst_dict is filled
+        # Find the largest burst
+        largest_burst_number = max(self._burst_dict, key= lambda x: len(set(self._burst_dict[x])))
+        for evt in self._burst_dict[largest_burst_number]:
+            # Assign burst size to all events in the largest burst
+            self.photon_df.burst_sizes[evt] = len(self._burst_dict[largest_burst_number])
+            for key in self._burst_dict.keys():
+                # Now delete the assigned events in all other candiate bursts to avoid double counting
+                if evt in self._burst_dict[key] and key != largest_burst_number:
+                    self._burst_dict[key].remove(evt)
+        # Delete the largest burst, which is processed above
+        self._burst_dict.pop(largest_burst_number, None)
+        # repeat while there are unprocessed bursts in _burst_dict
+        if len(self._burst_dict)>=1:
+            self.burst_counting()
+
+    def get_burst_hist(self):
+        burst_hist = {}
+        for i in np.unique(self.photon_df.burst_sizes.values):
+            burst_hist[i] = np.sum(self.photon_df.burst_sizes.values==i)/i
+        return burst_hist
+
+    def estimate_bkg_burst(self, window_size=1, method="scramble", copy=True):
+        """
+        :param method: either "scramble" or "rando"
+        :return:
+        """
+        #Note that from now on we are CHANGING the photon_df!
+        if method=="scramble":
+            self.scramble(copy=copy)
+        elif method=="rando":
+            self.t_rando(copy=copy)
+        bkg_burst_hist = self.search_time_window(window_size=window_size)
+        self.bkg_burst_hist = bkg_burst_hist
+        return bkg_burst_hist
 
 
     def plot_theta2(self, theta2s=np.arange(0, 2, 0.01), psf_width=0.1, N=100, const=1, ax=None, ylog=True):
@@ -479,6 +624,13 @@ def test_sim_likelihood(Nsim=1000, N_burst=3, filename=None, sig_bins=50, bkg_bi
     plt.show()
     return pbh
 
+def test_burst_finding(window_size=1, runNum=47717, filename="47717.anasum.root"):
+    pbh = Pbh()
+    pbh.get_TreeWithAllGamma(runNum=runNum)
+    sig_burst_hist = pbh.search_time_window(window_size=window_size)
+    plt.errorbar(sig_burst_hist.keys(), sig_burst_hist.values(), xerr=0.5, fmt='bs', capthick=0)
+    plt.show()
+    return pbh
 
 def test1():
     pbh = Pbh()
@@ -504,8 +656,11 @@ def test2():
     return pbh
 
 if __name__ == "__main__":
+    pbh = test_burst_finding(window_size=1, filename="47717.anasum.root")
     #pbh = test_psf_func(Nburst=10, filename=None)
-    pbh = test_psf_func_sim(psf_width=0.05, Nsim=10000, prob="psf", Nbins=40, xlim=(0,0.5),
-                            filename="/Users/qfeng/Data/veritas/pbh/reedbuck_plots/test_sim_psf/sim_psf_theta2hist_hypsec_sig.pdf")
+
+    #pbh = test_psf_func_sim(psf_width=0.05, Nsim=10000, prob="psf", Nbins=40, xlim=(0,0.5),
+    #                        filename="/Users/qfeng/Data/veritas/pbh/reedbuck_plots/test_sim_psf/sim_psf_theta2hist_hypsec_sig.pdf")
+
     #pbh = test_psf_func_sim(psf_width=0.05, prob="uniform", Nsim=10000, Nbins=40, xlim=None,
     #                        filename="/Users/qfeng/Data/veritas/pbh/reedbuck_plots/test_sim_psf/sim_psf_theta2hist_uniform_bkg.pdf")
