@@ -296,7 +296,7 @@ class Pbh(object):
         # Master event loop:
         for t in self.photon_df.ts:
             slice_index = np.where((self.photon_df.ts>=t) & (self.photon_df.ts<(t+window_size)))
-            _N = self.photon_df.ts[slice_index].shape[0]
+            _N = self.photon_df.ts.values[slice_index].shape[0]
             if _N < 1:
                 print "Should never happen"
                 raise
