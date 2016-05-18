@@ -132,10 +132,16 @@ class Pbh(object):
         #self.photon_df = df_
         #clean events that did not pass cut:
         self.photon_df = df_[df_.fail_cut==0]
+        #reindexing
+        self.photon_df.index = range(self.photon_df.shape[0])
 
         self.photon_df.psfs = self.get_psf_lists()
+
+        #If
+        #df = df[df.line_race.notnull()]
+
         ###QF
-        self.photon_df.head()
+        print self.photon_df.head()
 
 
     def scramble(self, copy=False):
@@ -201,10 +207,16 @@ class Pbh(object):
             print "Call get_TreeWithAllGamma first..."
         ###QF:
         print "getting psf"
-        for i, EL_ in enumerate(self.photon_df.ELs):
-            print self.photon_df.Es[i], EL_
-            self.photon_df.psfs.at[i] = self.get_psf(E=self.photon_df.Es[i], EL=EL_)
-            print "PSF,", self.photon_df.psfs.at[i]
+        for i, EL_ in enumerate(self.photon_df.ELs.values):
+            #self.photon_df.psfs.at[i] = self.get_psf(E=self.photon_df.loc[i, 'Es'], EL=EL_)
+            self.photon_df.loc[i, 'psfs'] = self.get_psf(E=self.photon_df.loc[i, 'Es'], EL=EL_)
+            if i%1000==0:
+                print i, "events got psfs"
+                print self.photon_df.loc[i, 'Es'], EL_
+                print self.photon_df.psfs[i]
+            if self.photon_df.psfs[i] is None:
+                print "Got a None psf, energy is ", self.photon_df.loc[i, 'Es'], "EL is ", EL_
+            #print "PSF,", self.photon_df.psfs.at[i]
 
     def get_angular_distance(self, coord1, coord2):
         """
