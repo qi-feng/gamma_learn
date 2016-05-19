@@ -141,7 +141,7 @@ class Pbh(object):
         #df = df[df.line_race.notnull()]
 
         ###QF
-        print self.photon_df.head()
+        #print self.photon_df.head()
 
 
     def scramble(self, copy=False):
@@ -299,7 +299,8 @@ class Pbh(object):
         #            given that a burst is found, or the input has only one event
         #         B) centroid, likelihood, a list of event numbers excluding the outlier, the outlier event number
         #            given that we reject the hypothesis of a burst
-        print coords, slice_index
+        ###QF
+        #print coords, slice_index
         assert coords.shape[0] == slice_index.shape[0], "coords shape "+coords.shape[0]+" and slice_index shape "+slice_index.shape[0]+" are different"
         if slice_index.shape[0]==1:
             #one event:
@@ -323,11 +324,12 @@ class Pbh(object):
 
             #return centroid, ll_centroid, coords[mask,:], psfs[mask], coords[outlier_index,:], psfs[outlier_index]
             #return centroid, ll_centroid, slice_index[mask], slice_index[outlier_index]
-            print "mask", mask
-            print "outlier", outlier_index
-            print "slice_index", slice_index, type(slice_index)
-            print "search_angular_window returning better events", slice_index[mask]
-            print "returning outlier events", slice_index[outlier_index]
+            ###QF
+            #print "mask", mask
+            #print "outlier", outlier_index
+            #print "slice_index", slice_index, type(slice_index)
+            #print "search_angular_window returning better events", slice_index[mask]
+            #print "returning outlier events", slice_index[outlier_index]
             return centroid, ll_centroid, slice_index[mask], slice_index[outlier_index]
 
     def search_time_window(self, window_size=1):
@@ -362,7 +364,8 @@ class Pbh(object):
                 outlier_burst_events, outlier_of_outlier_events = self.search_event_slice(outlier_events)
 
                 while outlier_of_outlier_events is not None:
-                    print "loop through the outliers "
+                    ###QF
+                    #print "loop through the outliers "
                     #loop until no outliers are left unprocessed
                     if len(outlier_of_outlier_events)==1:
                         self.photon_df.burst_sizes[outlier_of_outlier_events[0]] = 1
@@ -388,19 +391,19 @@ class Pbh(object):
         """
         N_ = self.photon_df.shape[0]
         ###QF
-        print "Slice"
-        print slice_index
-        print "Type"
-        print type(slice_index)
-        print "tuple Slice"
-        print tuple(slice_index)
-        print "length", len(tuple(np.array(slice_index)[:,np.newaxis].T))
-        print "Coords"
-        print "Shape"
-        print np.concatenate([self.photon_df.RAs.reshape(N_,1), self.photon_df.Decs.reshape(N_,1)], axis=1).shape
-        print np.concatenate([self.photon_df.RAs.values.reshape(N_,1), self.photon_df.Decs.values.reshape(N_,1)], axis=1)[tuple(slice_index[:,np.newaxis].T)]
-        print "PSFs"
-        print self.photon_df.psfs.values[tuple(slice_index[:,np.newaxis].T)]
+        #print "Slice"
+        #print slice_index
+        #print "Type"
+        #print type(slice_index)
+        #print "tuple Slice"
+        #print tuple(slice_index)
+        #print "length", len(tuple(np.array(slice_index)[:,np.newaxis].T))
+        #print "Coords"
+        #print "Shape"
+        #print np.concatenate([self.photon_df.RAs.reshape(N_,1), self.photon_df.Decs.reshape(N_,1)], axis=1).shape
+        #print np.concatenate([self.photon_df.RAs.values.reshape(N_,1), self.photon_df.Decs.values.reshape(N_,1)], axis=1)[tuple(slice_index[:,np.newaxis].T)]
+        #print "PSFs"
+        #print self.photon_df.psfs.values[tuple(slice_index[:,np.newaxis].T)]
         ang_search_res = self.search_angular_window(np.concatenate([self.photon_df.RAs.reshape(N_,1), self.photon_df.Decs.reshape(N_,1)], axis=1)[tuple(slice_index[:,np.newaxis].T)], self.photon_df.psfs.values[tuple(slice_index[:,np.newaxis].T)],
                                                     slice_index)
         outlier_evts = []
@@ -419,10 +422,11 @@ class Pbh(object):
             # this loop breaks when a burst is found or only one event is left, in which case return values has a length of 3
                 better_centroid, better_ll_centroid, _better_events, _outlier_events = ang_search_res
                 outlier_evts.append(_outlier_events)
-                print tuple(_better_events), _better_events
+                ###QF
+                #print tuple(_better_events), _better_events
                 #better_coords = np.concatenate([self.photon_df.RAs.reshape(N_,1), self.photon_df.Decs.reshape(N_,1)], axis=1)[tuple(_better_events)]
                 better_coords = np.concatenate([self.photon_df.RAs.reshape(N_,1), self.photon_df.Decs.reshape(N_,1)], axis=1)[(_better_events)]
-                print "in search_event_slice, candidate coords and psfs: ", better_coords, self.photon_df.psfs.values[(_better_events)]
+                #print "in search_event_slice, candidate coords and psfs: ", better_coords, self.photon_df.psfs.values[(_better_events)]
                 ang_search_res = self.search_angular_window(better_coords,
                                                             self.photon_df.psfs.values[(_better_events)],
                                                             _better_events)
