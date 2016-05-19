@@ -203,19 +203,23 @@ class Pbh(object):
         return self.psf_lookup[E_bin, EL_bin]
 
     def get_psf_lists(self):
+        """
+        This thing is slow...
+        :return: nothing but filles photon_df.psfs, a number that is repeatedly used later
+        """
         if not hasattr(self, 'photon_df'):
             print "Call get_TreeWithAllGamma first..."
         ###QF:
         print "getting psf"
         for i, EL_ in enumerate(self.photon_df.ELs.values):
             #self.photon_df.psfs.at[i] = self.get_psf(E=self.photon_df.loc[i, 'Es'], EL=EL_)
-            self.photon_df.loc[i, 'psfs'] = self.get_psf(E=self.photon_df.loc[i, 'Es'], EL=EL_)
-            if i%10000==0:
-                print i, "events got psfs"
-                print self.photon_df.loc[i, 'Es'], EL_
-                print self.photon_df.psfs[i]
-            if self.photon_df.psfs[i] is None:
-                print "Got a None psf, energy is ", self.photon_df.loc[i, 'Es'], "EL is ", EL_
+            self.photon_df.at[i, 'psfs'] = self.get_psf(E=self.photon_df.at[i, 'Es'], EL=EL_)
+            #if i%10000==0:
+            #    print i, "events got psfs"
+            #    print self.photon_df.at[i, 'Es'], EL_
+            #    print self.photon_df.psfs[i]
+            #if self.photon_df.psfs[i] is None:
+            #    print "Got a None psf, energy is ", self.photon_df.at[i, 'Es'], "EL is ", EL_
             #print "PSF,", self.photon_df.psfs.at[i]
 
     def get_angular_distance(self, coord1, coord2):
@@ -381,7 +385,7 @@ class Pbh(object):
         print np.concatenate([self.photon_df.RAs.reshape(N_,1), self.photon_df.Decs.reshape(N_,1)], axis=1)
         print "PSFs"
         print self.photon_df.psfs.values[slice_index]
-        ang_search_res = self.search_angular_window(np.concatenate([self.photon_df.RAs.reshape(N_,1), self.photon_df.Decs.reshape(N_,1)], axis=1), self.photon_df.psfs.values[slice_index],
+        ang_search_res = self.search_angular_window(np.concatenate([self.photon_df.RAs.reshape(N_,1), self.photon_df.Decs.reshape(N_,1)], axis=1)[slice_index], self.photon_df.psfs.values[slice_index],
                                                     np.array(slice_index[0]))
         outlier_evts = []
 
