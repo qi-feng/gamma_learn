@@ -65,7 +65,7 @@ class Pbh(object):
         #clean events that did not pass cut:
         self.photon_df = df_[df_.fail_cut==0]
 
-        self.photon_df.psfs = self.get_psf_lists()
+        self.get_psf_lists()
 
     def readEDfile(self, runNum=None, filename=None):
         self.runNum = runNum
@@ -135,7 +135,7 @@ class Pbh(object):
         #reindexing
         self.photon_df.index = range(self.photon_df.shape[0])
 
-        self.photon_df.psfs = self.get_psf_lists()
+        self.get_psf_lists()
 
         #If
         #df = df[df.line_race.notnull()]
@@ -210,7 +210,7 @@ class Pbh(object):
         for i, EL_ in enumerate(self.photon_df.ELs.values):
             #self.photon_df.psfs.at[i] = self.get_psf(E=self.photon_df.loc[i, 'Es'], EL=EL_)
             self.photon_df.loc[i, 'psfs'] = self.get_psf(E=self.photon_df.loc[i, 'Es'], EL=EL_)
-            if i%1000==0:
+            if i%10000==0:
                 print i, "events got psfs"
                 print self.photon_df.loc[i, 'Es'], EL_
                 print self.photon_df.psfs[i]
