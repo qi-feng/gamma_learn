@@ -403,6 +403,7 @@ class Pbh(object):
             # this loop breaks when a burst is found or only one event is left, in which case return values has a length of 3
                 better_centroid, better_ll_centroid, _better_events, _outlier_events = ang_search_res
                 outlier_evts.append(_outlier_events)
+                print tuple(_better_events), _better_events
                 better_coords = np.concatenate([self.photon_df.RAs.reshape(N_,1), self.photon_df.Decs.reshape(N_,1)], axis=1)[tuple(_better_events)]
                 ang_search_res = self.search_angular_window(better_coords,
                                                             self.photon_df.psfs[tuple(_better_events)],
