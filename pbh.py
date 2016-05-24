@@ -80,7 +80,7 @@ class Pbh(object):
         self.Rfile = ROOT.TFile(self.filename, "read");
 
 
-    def get_TreeWithAllGamma(self, runNum=None, E_lo_cut=0.08, E_hi_cut=50.0, EL_lo_cut=50.0):
+    def get_TreeWithAllGamma(self, runNum=None, E_lo_cut=0.08, E_hi_cut=50.0, EL_lo_cut=50.0, nlines=None):
         """
         :param runNum:
         :return: nothing but fills photon_df, except photon_df.burst_sizes
@@ -107,15 +107,19 @@ class Pbh(object):
         #ptTime=np.array(ptTime)
         #columns=['runNumber','eventNumber', 'MJD', 'Time', 'Elevation', ]
         columns=['MJDs', 'ts', 'RAs', 'Decs', 'Es', 'ELs', 'psfs', 'burst_sizes', 'fail_cut']
-        N_ = all_gamma_tree.GetEntries()
+        if nlines is not None:
+            N_ = nlines
+        else:
+            N_ = all_gamma_tree.GetEntries()
         df_ = pd.DataFrame(np.array([np.zeros(N_)]*len(columns)).T,
                            columns=columns)
         ###QF short breaker:
         breaker = 0
         for i, event in enumerate(all_gamma_tree):
-            #if breaker >1000:
-            #    break
-            #breaker+=1
+            if nlines is not None:
+                if breaker >= nlines:
+                    break
+                breaker+=1
             #time_index=np.argmax(ptTime>event.Time)
             #making cut:
             if event.Energy<E_lo_cut or event.Energy>E_hi_cut or event.TelElevation<EL_lo_cut:
@@ -308,6 +312,9 @@ class Pbh(object):
         ###QF
         #print coords, slice_index
         assert coords.shape[0] == slice_index.shape[0], "coords shape "+coords.shape[0]+" and slice_index shape "+slice_index.shape[0]+" are different"
+        if slice_index.shape[0]==0:
+            #empty
+            return None, None, None, None
         if slice_index.shape[0]==1:
             #one event:
             return coords, 1, np.array([1])
@@ -360,7 +367,7 @@ class Pbh(object):
                 continue
             burst_events, outlier_events = self.search_event_slice(np.array(slice_index[0]))
             if outlier_events is None:
-                #All events of slice_index form a burst, no outliers
+                #All events of slice_index form a burst, no outliers; or all events are singlet
                 continue
             if len(outlier_events)==1:
                 #A singlet outlier
@@ -373,8 +380,8 @@ class Pbh(object):
                     ###QF
                     #print "loop through the outliers "
                     #loop until no outliers are left unprocessed
-                    if len(outlier_of_outlier_events)==1:
-                        self.photon_df.burst_sizes[outlier_of_outlier_events[0]] = 1
+                    if len(outlier_of_outlier_events)<=1:
+                        #self.photon_df.burst_sizes[outlier_of_outlier_events[0]] = 1
                         outlier_of_outlier_events=None
                         break
                     else:
@@ -450,6 +457,10 @@ class Pbh(object):
 
         #First remove singlet
         slice_index = self.singlet_remover(slice_index)
+        #print slice_index
+        if slice_index.shape[0]==0:
+            #all singlets, no bursts, and don't need to check for outliers, go to next event
+            return None, None
 
         ang_search_res = self.search_angular_window(np.concatenate([self.photon_df.RAs.reshape(N_,1), self.photon_df.Decs.reshape(N_,1)], axis=1)[tuple(slice_index[:,np.newaxis].T)], self.photon_df.psfs.values[tuple(slice_index[:,np.newaxis].T)],
                                                     slice_index)
@@ -741,9 +752,11 @@ def test_sim_likelihood(Nsim=1000, N_burst=3, filename=None, sig_bins=50, bkg_bi
     plt.show()
     return pbh
 
-def test_burst_finding(window_size=1, runNum=47717, filename="47717.anasum.root"):
+def test_burst_finding(window_size=1, runNum=55480):
     pbh = Pbh()
-    pbh.get_TreeWithAllGamma(runNum=runNum)
+    pbh.get_TreeWithAllGamma(runNum=runNum, nlines=1000)
+    #do a small list
+    pbh.photon_df = pbh.photon_df[:1000]
     sig_burst_hist = pbh.search_time_window(window_size=window_size)
     plt.errorbar(sig_burst_hist.keys(), sig_burst_hist.values(), xerr=0.5, fmt='bs', capthick=0)
     plt.show()
@@ -796,13 +809,13 @@ def test_singlet_remover(Nburst=10, filename=None, cent_ms=8.0, cent_mew=1.8):
 
 def test2():
     pbh = Pbh()
-    pbh.get_TreeWithAllGamma(runNum=47717)
+    pbh.get_TreeWithAllGamma(runNum=55480, nlines=1000)
     print pbh.photon_df.head()
     return pbh
 
 if __name__ == "__main__":
-    test_singlet_remover()
-    #pbh = test_burst_finding(window_size=1, runNum=55480, filename="55480.anasum.root")
+    #test_singlet_remover()
+    pbh = test_burst_finding(window_size=1, runNum=55480)
     #pbh = test_psf_func(Nburst=10, filename=None)
 
     #pbh = test_psf_func_sim(psf_width=0.05, Nsim=10000, prob="psf", Nbins=40, xlim=(0,0.5),
