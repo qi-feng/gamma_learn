@@ -363,7 +363,8 @@ class Pbh(object):
                 raise
             if _N == 1:
                 #a sparse window
-                self.photon_df.burst_sizes[slice_index] = 1
+                #self.photon_df.burst_sizes[slice_index] = 1
+                self.photon_df.iat[slice_index, 'burst_sizes'] = 1
                 continue
             burst_events, outlier_events = self.search_event_slice(np.array(slice_index[0]))
             if outlier_events is None:
@@ -371,7 +372,9 @@ class Pbh(object):
                 continue
             if len(outlier_events)==1:
                 #A singlet outlier
-                self.photon_df.burst_sizes[outlier_events[0]] = 1
+                #self.photon_df.burst_sizes[outlier_events[0]] = 1
+                self.photon_df.iat[outlier_events[0], 'burst_sizes'] = 1
+
             else:
                 #If there is a burst of a subset of events, it's been taken care of, now take care of the outlier slice
                 outlier_burst_events, outlier_of_outlier_events = self.search_event_slice(outlier_events)
