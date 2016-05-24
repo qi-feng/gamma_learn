@@ -50,7 +50,7 @@ class Pbh(object):
         N_ = len(ts)
         assert N_==len(RAs) and N_==len(Decs) and N_==len(Es) and N_==len(ELs), \
             "Make sure input lists (ts, RAs, Decs, Es, ELs) are of the same dimension"
-        columns=['MJDs', 'ts', 'RAs', 'Decs', 'Es', 'ELs', 'psfs', 'burst_sizes']
+        columns=['MJDs', 'ts', 'RAs', 'Decs', 'Es', 'ELs', 'psfs', 'burst_sizes', 'fail_cut']
         df_ = pd.DataFrame(np.array([np.zeros(N_)]*len(columns)).T,
                       columns=columns)
         df_.ts = ts
@@ -62,6 +62,10 @@ class Pbh(object):
         df_.psfs = np.zeros(N_)
         df_.burst_sizes = np.zeros(N_)
         #self.photon_df = df_
+        #if event.Energy<E_lo_cut or event.Energy>E_hi_cut or event.TelElevation<EL_lo_cut:
+        #    df_.fail_cut.at[i] = 1
+        #    continue
+        df_.fail_cut = np.zeros(N_)
         #clean events that did not pass cut:
         self.photon_df = df_[df_.fail_cut==0]
 
@@ -271,6 +275,7 @@ class Pbh(object):
         else:
             return "Input prob value not supported"
 
+
     def centroid_log_likelihood(self, cent_coord, coords, psfs):
         """
         returns ll=-2*ln(L)
@@ -291,6 +296,7 @@ class Pbh(object):
         centroid = results.x
         ll_centroid = self.centroid_log_likelihood(centroid, coords, psfs)
         return centroid, ll_centroid
+
 
     def search_angular_window(self, coords, psfs, slice_index):
         # Determine if N_evt = coords.shape[0] events are accepted to come from one direction
@@ -383,6 +389,43 @@ class Pbh(object):
         #return self.photon_df.burst_sizes
         return burst_hist
 
+    def singlet_remover(self, slice_index):
+        """
+        :param slice_index: a np array of events' indices in photon_df
+        :return: new slice_index with singlets (no neighbors in a radius of 5*psf) removed;
+                 return None if all events are singlets
+        """
+        if slice_index.shape[0]==1:
+            #one event, singlet by definition:
+            #return Nones
+            return None
+        N_ = self.photon_df.shape[0]
+        slice_tuple = tuple(slice_index[:,np.newaxis].T)
+        coord_slice = np.concatenate([self.photon_df.RAs.reshape(N_,1), self.photon_df.Decs.reshape(N_,1)], axis=1)[slice_tuple]
+        psf_slice = self.photon_df.psfs.values[slice_tuple]
+        #default all events are singlet
+        mask_ = np.zeros(slice_index.shape[0], dtype=bool)
+        #use a dict of {event_num:neighbor_found} to avoid redundancy
+        none_singlet_dict = {}
+        for i in range(slice_index.shape[0]):
+            if slice_index[i] in none_singlet_dict:
+                #already knew not a singlet
+                continue
+            else:
+                psf_5 = psf_slice[slice_index[i]]*5.0
+                for j in range(slice_index.shape[0]):
+                    if j==i:
+                        #self
+                        continue
+                    elif self.get_angular_distance(coord_slice[slice_index[i]], coord_slice[slice_index[j]]) < psf_5:
+                        #decide this pair isn't singlet
+                        none_singlet_dict[slice_index[i]] = slice_index[j]
+                        none_singlet_dict[slice_index[j]] = slice_index[j]
+                        mask_[i]=True
+                        mask_[j]=True
+                        continue
+        return slice_index[mask_]
+
     def search_event_slice(self, slice_index):
         """
         :param slice_index: np array of indices of the events in photon_df that the burst search is carried out upon
@@ -404,6 +447,10 @@ class Pbh(object):
         #print np.concatenate([self.photon_df.RAs.values.reshape(N_,1), self.photon_df.Decs.values.reshape(N_,1)], axis=1)[tuple(slice_index[:,np.newaxis].T)]
         #print "PSFs"
         #print self.photon_df.psfs.values[tuple(slice_index[:,np.newaxis].T)]
+
+        #First remove singlet
+        slice_index = self.singlet_remover(slice_index)
+
         ang_search_res = self.search_angular_window(np.concatenate([self.photon_df.RAs.reshape(N_,1), self.photon_df.Decs.reshape(N_,1)], axis=1)[tuple(slice_index[:,np.newaxis].T)], self.photon_df.psfs.values[tuple(slice_index[:,np.newaxis].T)],
                                                     slice_index)
         outlier_evts = []
@@ -718,6 +765,34 @@ def test1():
     pbh.plot_skymap(centroid.reshape(1,2), [0.1], [0.2], ax=ax, color='b', fov_center=fov_center)
     plt.show()
 
+def test_singlet_remover(Nburst=10, filename=None, cent_ms=8.0, cent_mew=1.8):
+    pbh = Pbh()
+    fov_center = np.array([180., 30.0])
+    fov = 1.75
+
+    #spec sim:
+    index = -2.5
+    E_min = 0.08
+    E_max = 50.0
+    EL = 75
+    pl_nu = powerlaw(index, E_min, E_max)
+    rand_Es =  pl_nu.random(Nburst)
+    rand_bkg_coords = np.zeros((Nburst, 2))
+    rand_sig_coords = np.zeros((Nburst, 2))
+    psfs = np.zeros(Nburst)
+
+    for i in range(Nburst):
+        psf_width = pbh.get_psf(rand_Es[i], EL)
+        psfs[i] = psf_width
+        rand_bkg_theta = pbh.gen_one_random_theta(psf_width, prob="uniform", fov=fov)
+        rand_sig_theta = pbh.gen_one_random_theta(psf_width, prob="psf", fov=fov)
+        rand_bkg_coords[i,:] = pbh.gen_one_random_coords(fov_center, rand_bkg_theta)
+        rand_sig_coords[i,:] = pbh.gen_one_random_coords(fov_center, rand_sig_theta)
+
+    pbh.read_photon_list(np.arange(10), rand_bkg_coords[:,0], rand_bkg_coords[:,1], rand_Es, np.ones(10)*EL)
+    slice = np.arange(10)
+    slice = pbh.singlet_remover(slice)
+    print slice
 
 def test2():
     pbh = Pbh()
@@ -726,7 +801,8 @@ def test2():
     return pbh
 
 if __name__ == "__main__":
-    pbh = test_burst_finding(window_size=1, runNum=55480, filename="55480.anasum.root")
+    test_singlet_remover()
+    #pbh = test_burst_finding(window_size=1, runNum=55480, filename="55480.anasum.root")
     #pbh = test_psf_func(Nburst=10, filename=None)
 
     #pbh = test_psf_func_sim(psf_width=0.05, Nsim=10000, prob="psf", Nbins=40, xlim=(0,0.5),
