@@ -364,6 +364,7 @@ class Pbh(object):
             if _N == 1:
                 #a sparse window
                 #self.photon_df.burst_sizes[slice_index] = 1
+                print "L367", slice_index
                 self.photon_df.at[slice_index, 'burst_sizes'] = 1
                 continue
             burst_events, outlier_events = self.search_event_slice(np.array(slice_index[0]))
@@ -374,7 +375,7 @@ class Pbh(object):
             elif outlier_events.shape[0]==1:
                 #A singlet outlier
                 #self.photon_df.burst_sizes[outlier_events[0]] = 1
-                print outlier_events, outlier_events[0]
+                print "L378", outlier_events, outlier_events[0]
                 self.photon_df.at[outlier_events[0], 'burst_sizes'] = 1
 
             else:
@@ -757,14 +758,15 @@ def test_sim_likelihood(Nsim=1000, N_burst=3, filename=None, sig_bins=50, bkg_bi
     plt.show()
     return pbh
 
-def test_burst_finding(window_size=1, runNum=55480):
+def test_burst_finding(window_size=1, runNum=55480, nlines=1000):
     pbh = Pbh()
-    pbh.get_TreeWithAllGamma(runNum=runNum, nlines=1000)
+    pbh.get_TreeWithAllGamma(runNum=runNum, nlines=nlines)
     #do a small list
-    pbh.photon_df = pbh.photon_df[:1000]
+    pbh.photon_df = pbh.photon_df[:nlines]
     sig_burst_hist = pbh.search_time_window(window_size=window_size)
     plt.errorbar(sig_burst_hist.keys(), sig_burst_hist.values(), xerr=0.5, fmt='bs', capthick=0)
-    plt.show()
+    #plt.show()
+    plt.savefig("test_burst_finding_histo.png")
     return pbh
 
 def test1():
