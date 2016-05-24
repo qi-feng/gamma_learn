@@ -412,12 +412,12 @@ class Pbh(object):
                 #already knew not a singlet
                 continue
             else:
-                psf_5 = psf_slice[slice_index[i]]*5.0
+                psf_5 = psf_slice[i]*5.0
                 for j in range(slice_index.shape[0]):
                     if j==i:
                         #self
                         continue
-                    elif self.get_angular_distance(coord_slice[slice_index[i]], coord_slice[slice_index[j]]) < psf_5:
+                    elif self.get_angular_distance(coord_slice[i], coord_slice[j]) < psf_5:
                         #decide this pair isn't singlet
                         none_singlet_dict[slice_index[i]] = slice_index[j]
                         none_singlet_dict[slice_index[j]] = slice_index[j]
