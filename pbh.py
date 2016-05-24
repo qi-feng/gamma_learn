@@ -363,7 +363,7 @@ class Pbh(object):
                 raise
             if _N == 1:
                 #a sparse window
-                self.photon_df.burst_size[slice_index] = 1
+                self.photon_df.burst_sizes[slice_index] = 1
                 continue
             burst_events, outlier_events = self.search_event_slice(np.array(slice_index[0]))
             if outlier_events is None:
