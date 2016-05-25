@@ -792,24 +792,27 @@ def test_sim_likelihood(Nsim=1000, N_burst=3, filename=None, sig_bins=50, bkg_bi
     return pbh
 
 
-def test_burst_finding(window_size=3, runNum=55480, nlines=100):
+def test_burst_finding(window_size=3, runNum=55480, nlines=50):
     pbh = Pbh()
     pbh.get_TreeWithAllGamma(runNum=runNum, nlines=nlines)
     #do a small list
     pbh.photon_df = pbh.photon_df[:nlines]
     sig_burst_hist = pbh.search_time_window(window_size=window_size)
     #sig_burst_hist is actually a dictionary
-    plt.errorbar(sig_burst_hist.keys(), sig_burst_hist.values(), xerr=0.5, fmt='bs', capthick=0)
-    plt.title("Window size " + str(window_size) + "s")
-    plt.xlabel("Burst size")
-    plt.ylabel("Counts")
-    #plt.ylim(0, np.max(sig_burst_hist.values())*1.2)
-    #plt.yscale('log')
-    plt.savefig("test_burst_finding_histo_signal_window" + str(window_size) + "s.png")
-    plt.show()
+    plotSig=False
+    if plotSig:
+        plt.figure()
+        plt.errorbar(sig_burst_hist.keys(), sig_burst_hist.values(), xerr=0.5, fmt='bs', capthick=0)
+        plt.title("Window size " + str(window_size) + "s")
+        plt.xlabel("Burst size")
+        plt.ylabel("Counts")
+        #plt.ylim(0, np.max(sig_burst_hist.values())*1.2)
+        #plt.yscale('log')
+        plt.savefig("test_burst_finding_histo_signal_window" + str(window_size) + "s.png")
+        plt.show()
 
     #now scramble:
-    N_scramble = 5
+    N_scramble = 3
     bkg_burst_hists = []
     for i in range(N_scramble):
         bkg_burst_hist = pbh.estimate_bkg_burst(window_size=window_size, method="scramble", copy=True)
@@ -819,21 +822,23 @@ def test_burst_finding(window_size=3, runNum=55480, nlines=100):
     all_bkg_burst_sizes = set(k for dic in bkg_burst_hists for k in dic.keys())
     #also a dict
     avg_bkg_hist = {}
-    avg_bkg_hist_count = {}
+    #avg_bkg_hist_count = {}
     for key_ in all_bkg_burst_sizes:
+        key_ = int(key_)
         for d_ in bkg_burst_hists:
             if key_ in d_:
                 if key_ in avg_bkg_hist:
                     avg_bkg_hist[key_] += d_[key_]
-                    avg_bkg_hist_count[key_] += 1
-            else:
-                avg_bkg_hist[key_] = d_[key_]
-                avg_bkg_hist_count[key_] = 1
+                    #avg_bkg_hist_count[key_] += 1
+                else:
+                    avg_bkg_hist[int(key_)] = d_[key_]
+                    #avg_bkg_hist_count[int(key_)] = 1
 
     for k in avg_bkg_hist.keys():
         #avg_bkg_hist[k] /= avg_bkg_hist_count[k]*1.0
         avg_bkg_hist[k] /= N_scramble*1.0
 
+    plt.figure()
     plt.errorbar(sig_burst_hist.keys(), sig_burst_hist.values(), xerr=0.5, fmt='bs', capthick=0,
                  label="Data " + str(nlines) + " events")
     plt.errorbar(avg_bkg_hist.keys(), avg_bkg_hist.values(), xerr=0.5, fmt='rv', capthick=0,
@@ -843,7 +848,7 @@ def test_burst_finding(window_size=3, runNum=55480, nlines=100):
     plt.ylabel("Counts")
     #plt.ylim(0, np.max(sig_burst_hist.values())*1.2)
     #plt.yscale('log')
-    plt.legend(loc='upper right')
+    plt.legend(loc='best')
     #plt.show()
     plt.savefig("test_burst_finding_histo_signal_bkg_avg_over"+str(N_scramble)+"scrambles_window"+ str(window_size) +".png")
 
