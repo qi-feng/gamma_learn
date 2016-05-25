@@ -792,7 +792,7 @@ def test_sim_likelihood(Nsim=1000, N_burst=3, filename=None, sig_bins=50, bkg_bi
     return pbh
 
 
-def test_burst_finding(window_size=3, runNum=55480, nlines=50):
+def test_burst_finding(window_size=3, runNum=55480, nlines=50, N_scramble=3):
     pbh = Pbh()
     pbh.get_TreeWithAllGamma(runNum=runNum, nlines=nlines)
     #do a small list
@@ -812,7 +812,7 @@ def test_burst_finding(window_size=3, runNum=55480, nlines=50):
         plt.show()
 
     #now scramble:
-    N_scramble = 3
+    #N_scramble = 3
     bkg_burst_hists = []
     for i in range(N_scramble):
         bkg_burst_hist = pbh.estimate_bkg_burst(window_size=window_size, method="scramble", copy=True)
