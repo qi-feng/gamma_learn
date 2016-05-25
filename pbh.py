@@ -7,6 +7,9 @@ from scipy.optimize import curve_fit, minimize
 from scipy import stats
 import random
 
+import sys
+sys.setrecursionlimit(10000)
+
 try:
     import ROOT
 except:
