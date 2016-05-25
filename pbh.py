@@ -365,7 +365,7 @@ class Pbh(object):
                 #a sparse window
                 #self.photon_df.burst_sizes[slice_index] = 1
                 print "L367", slice_index
-                self.photon_df.at[slice_index, 'burst_sizes'] = 1
+                self.photon_df.at[slice_index[0], 'burst_sizes'] = 1
                 continue
             burst_events, outlier_events = self.search_event_slice(np.array(slice_index[0]))
             if outlier_events is None:
@@ -522,11 +522,14 @@ class Pbh(object):
         largest_burst_number = max(self._burst_dict, key= lambda x: len(set(self._burst_dict[x])))
         for evt in self._burst_dict[largest_burst_number]:
             # Assign burst size to all events in the largest burst
-            self.photon_df.burst_sizes[evt] = len(self._burst_dict[largest_burst_number])
+            self.photon_df.burst_sizes[evt] = self._burst_dict[largest_burst_number].shape[0]
+            #self.photon_df.burst_sizes[evt] = len(self._burst_dict[largest_burst_number])
             for key in self._burst_dict.keys():
                 # Now delete the assigned events in all other candiate bursts to avoid double counting
                 if evt in self._burst_dict[key] and key != largest_burst_number:
-                    self._burst_dict[key].remove(evt)
+                    #self._burst_dict[key].remove(evt)
+                    self._burst_dict[key] = np.delete(self._burst_dict[key], np.where(self._burst_dict[key]==evt))
+
         # Delete the largest burst, which is processed above
         self._burst_dict.pop(largest_burst_number, None)
         # repeat while there are unprocessed bursts in _burst_dict
