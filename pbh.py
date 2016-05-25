@@ -8,7 +8,7 @@ from scipy import stats
 import random
 
 import sys
-sys.setrecursionlimit(10000)
+sys.setrecursionlimit(50000)
 
 try:
     import ROOT
@@ -162,7 +162,13 @@ class Pbh(object):
             #if you want to keep the original burst_dict, this should only happen at the 1st scramble
             if not hasattr(self, 'photon_df_orig'):
                 self.photon_df_orig = self.photon_df.copy()
-        self.photon_df.ts = random.shuffle(self.photon_df.ts)
+        ts_ = self.photon_df.ts.values
+        random.shuffle(ts_)
+        self.photon_df.at[:, 'ts'] = ts_
+        # re-init _burst_dict for counting
+        self._burst_dict={}
+        print self.photon_df.head()
+        print self.photon_df.ts.shape, self.photon_df.ts
         return self.photon_df.ts
 
     def t_rando(self, copy=False):
@@ -350,13 +356,16 @@ class Pbh(object):
 
     def search_time_window(self, window_size=1):
         """
+        Start a burst search for the given window_size in photon_df
+        _burst_dict needs to be clean for a new scramble
         :param window_size: in the unit of second
         :return: burst_hist, in the process 1) fill self._burst_dict, and
                                             2) fill self.photon_df.burst_sizes through burst counting; and
                                             3) fill self.photon_df.burst_sizes
         """
         assert hasattr(self, 'photon_df'), "photon_df doesn't exist, read data first (read_photon_list or get_TreeWithAllGamma)"
-
+        if len(self._burst_dict) != 0:
+            print "You started a burst search while there are already things in _burst_dict,  "
         # Master event loop:
         for t in self.photon_df.ts:
             slice_index = np.where((self.photon_df.ts>=t) & (self.photon_df.ts<(t+window_size)))
@@ -444,6 +453,7 @@ class Pbh(object):
 
     def search_event_slice(self, slice_index):
         """
+        _burst_dict needs to be clean before starting a new scramble
         :param slice_index: np array of indices of the events in photon_df that the burst search is carried out upon
         :return: np array of indices of events that are in a burst, indices of outliers (None if no outliers);
                  in the process fill self._burst_dict for later burst counting
@@ -764,15 +774,39 @@ def test_sim_likelihood(Nsim=1000, N_burst=3, filename=None, sig_bins=50, bkg_bi
     plt.show()
     return pbh
 
-def test_burst_finding(window_size=1, runNum=55480, nlines=1000):
+def test_burst_finding(window_size=1, runNum=55480, nlines=100):
     pbh = Pbh()
     pbh.get_TreeWithAllGamma(runNum=runNum, nlines=nlines)
     #do a small list
     pbh.photon_df = pbh.photon_df[:nlines]
     sig_burst_hist = pbh.search_time_window(window_size=window_size)
     plt.errorbar(sig_burst_hist.keys(), sig_burst_hist.values(), xerr=0.5, fmt='bs', capthick=0)
+    plt.title("Window size "+str(window_size)+"s")
+    plt.xlabel("Burst size")
+    plt.ylabel("Counts")
+    plt.ylim(0, np.max(sig_burst_hist.values())*1.2)
+    plt.yscale('log')
     #plt.show()
-    plt.savefig("test_burst_finding_histo.png")
+    plt.savefig("test_burst_finding_histo_signal.png")
+
+    #now scramble:
+    N_scramble=1
+    bkg_burst_hists=[]
+    for i in range(N_scramble):
+        bkg_burst_hist = pbh.estimate_bkg_burst(window_size=window_size, method="scramble", copy=True)
+        bkg_burst_hists.append(bkg_burst_hist)
+
+    plt.errorbar(sig_burst_hist.keys(), sig_burst_hist.values(), xerr=0.5, fmt='bs', capthick=0, label="Data "+str(nlines)+" events")
+    plt.errorbar(bkg_burst_hist.keys(), bkg_burst_hist.values(), xerr=0.5, fmt='rv', capthick=0, label="Background "+str(nlines)+" events")
+    plt.title("Window size "+str(window_size)+"s")
+    plt.xlabel("Burst size")
+    plt.ylabel("Counts")
+    plt.ylim(0, np.max(sig_burst_hist.values())*1.2)
+    plt.yscale('log')
+    plt.legend(loc='upper right')
+    #plt.show()
+    plt.savefig("test_burst_finding_histo_signal_bkg.png")
+
     return pbh
 
 def test1():
