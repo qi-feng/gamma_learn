@@ -167,8 +167,8 @@ class Pbh(object):
         self.photon_df.at[:, 'ts'] = ts_
         # re-init _burst_dict for counting
         self._burst_dict={}
-        print self.photon_df.head()
-        print self.photon_df.ts.shape, self.photon_df.ts
+        #print self.photon_df.head()
+        #print self.photon_df.ts.shape, self.photon_df.ts
         return self.photon_df.ts
 
     def t_rando(self, copy=False):
@@ -376,7 +376,7 @@ class Pbh(object):
             if _N == 1:
                 #a sparse window
                 #self.photon_df.burst_sizes[slice_index] = 1
-                print "L367", slice_index
+                #print "L367", slice_index
                 self.photon_df.at[slice_index[0], 'burst_sizes'] = 1
                 continue
             burst_events, outlier_events = self.search_event_slice(np.array(slice_index[0]))
@@ -387,7 +387,7 @@ class Pbh(object):
             elif outlier_events.shape[0]==1:
                 #A singlet outlier
                 #self.photon_df.burst_sizes[outlier_events[0]] = 1
-                print "L378", outlier_events, outlier_events[0]
+                #print "L378", outlier_events, outlier_events[0]
                 self.photon_df.at[outlier_events[0], 'burst_sizes'] = 1
 
             else:
@@ -784,13 +784,13 @@ def test_burst_finding(window_size=1, runNum=55480, nlines=100):
     plt.title("Window size "+str(window_size)+"s")
     plt.xlabel("Burst size")
     plt.ylabel("Counts")
-    plt.ylim(0, np.max(sig_burst_hist.values())*1.2)
-    plt.yscale('log')
-    #plt.show()
+    #plt.ylim(0, np.max(sig_burst_hist.values())*1.2)
+    #plt.yscale('log')
     plt.savefig("test_burst_finding_histo_signal.png")
+    plt.show()
 
     #now scramble:
-    N_scramble=1
+    N_scramble=10
     bkg_burst_hists=[]
     for i in range(N_scramble):
         bkg_burst_hist = pbh.estimate_bkg_burst(window_size=window_size, method="scramble", copy=True)
@@ -801,8 +801,8 @@ def test_burst_finding(window_size=1, runNum=55480, nlines=100):
     plt.title("Window size "+str(window_size)+"s")
     plt.xlabel("Burst size")
     plt.ylabel("Counts")
-    plt.ylim(0, np.max(sig_burst_hist.values())*1.2)
-    plt.yscale('log')
+    #plt.ylim(0, np.max(sig_burst_hist.values())*1.2)
+    #plt.yscale('log')
     plt.legend(loc='upper right')
     #plt.show()
     plt.savefig("test_burst_finding_histo_signal_bkg.png")
