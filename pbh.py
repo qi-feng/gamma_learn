@@ -6,6 +6,7 @@ import pandas as pd
 from scipy.optimize import curve_fit, minimize
 from scipy import stats
 import random
+import cPickle as pickle
 
 import sys
 
@@ -18,6 +19,10 @@ except:
 
 import time
 
+try:
+    from numba import jit
+except:
+    print("Numba not installed")
 
 def deg2rad(deg):
     return deg / 180. * np.pi
@@ -83,7 +88,6 @@ class Pbh(object):
             if os.path.isfile(filename):
                 self.filename = filename
         self.Rfile = ROOT.TFile(self.filename, "read");
-
 
     def get_TreeWithAllGamma(self, runNum=None, E_lo_cut=0.08, E_hi_cut=50.0, EL_lo_cut=50.0, nlines=None):
         """
@@ -200,6 +204,7 @@ class Pbh(object):
             self.photon_df.ts.at[i + 1] = self.photon_df.ts[i] + _rando_delta_t
         return self.photon_df.ts
 
+    @jit
     def psf_func(self, theta2, psf_width, N=100):
         return 1.71 * N / 2. / np.pi / psf_width ** 2 / np.cosh(np.sqrt(theta2) / psf_width)
         # equivalently:
@@ -222,6 +227,7 @@ class Pbh(object):
         EL_bin = np.digitize(EL, self.EL_grid) - 1
         return self.psf_lookup[E_bin, EL_bin]
 
+    @jit
     def get_psf_lists(self):
         """
         This thing is slow...
@@ -242,6 +248,7 @@ class Pbh(object):
             #    print "Got a None psf, energy is ", self.photon_df.at[i, 'Es'], "EL is ", EL_
             #print "PSF,", self.photon_df.psfs.at[i]
 
+    @jit
     def get_angular_distance(self, coord1, coord2):
         """
         coord1 and coord2 are in [ra, dec] format in degrees
@@ -250,6 +257,7 @@ class Pbh(object):
                                  + np.cos(deg2rad(coord1[1])) * np.cos(deg2rad(coord2[1])) *
                                  np.cos(deg2rad(coord1[0]) - deg2rad(coord2[0]))))
 
+    @jit
     def get_all_angular_distance(self, coords, cent_coord):
         assert coords.shape[1] == 2
         dists = np.zeros(coords.shape[0])
@@ -291,7 +299,7 @@ class Pbh(object):
         else:
             return "Input prob value not supported"
 
-
+    @jit
     def centroid_log_likelihood(self, cent_coord, coords, psfs):
         """
         returns ll=-2*ln(L)
@@ -306,13 +314,13 @@ class Pbh(object):
         #Normalized by the number of events!
         return ll / psfs.shape[0]
 
+    @jit
     def minimize_centroid_ll(self, coords, psfs):
         init_centroid = np.mean(coords, axis=0)
         results = minimize(self.centroid_log_likelihood, init_centroid, args=(coords, psfs), method='L-BFGS-B')
         centroid = results.x
         ll_centroid = self.centroid_log_likelihood(centroid, coords, psfs)
         return centroid, ll_centroid
-
 
     def search_angular_window(self, coords, psfs, slice_index):
         # Determine if N_evt = coords.shape[0] events are accepted to come from one direction
@@ -420,6 +428,7 @@ class Pbh(object):
         #return self.photon_df.burst_sizes
         return burst_hist
 
+    @jit
     def singlet_remover(self, slice_index):
         """
         :param slice_index: a np array of events' indices in photon_df
@@ -538,6 +547,7 @@ class Pbh(object):
         self.burst_dict = self._burst_dict.copy()
         return self.burst_dict
 
+    @jit
     def burst_counting(self):
         """
         :return: nothing but fills self.photon_df.burst_sizes
@@ -792,11 +802,12 @@ def test_sim_likelihood(Nsim=1000, N_burst=3, filename=None, sig_bins=50, bkg_bi
     return pbh
 
 
-def test_burst_finding(window_size=3, runNum=55480, nlines=50, N_scramble=3):
+def test_burst_finding(window_size=3, runNum=55480, nlines=100, N_scramble=3,
+                       save_sig="test_burst_finding_histo_signal_window", save_bkg="test_burst_finding_histo_bkg_window"):
     pbh = Pbh()
     pbh.get_TreeWithAllGamma(runNum=runNum, nlines=nlines)
     #do a small list
-    pbh.photon_df = pbh.photon_df[:nlines]
+    #pbh.photon_df = pbh.photon_df[:nlines]
     sig_burst_hist = pbh.search_time_window(window_size=window_size)
     #sig_burst_hist is actually a dictionary
     plotSig=False
@@ -811,12 +822,16 @@ def test_burst_finding(window_size=3, runNum=55480, nlines=50, N_scramble=3):
         plt.savefig("test_burst_finding_histo_signal_window" + str(window_size) + "s.png")
         plt.show()
 
+    dump_pickle(sig_burst_hist, save_sig+str(window_size)+".pkl")
+
     #now scramble:
     #N_scramble = 3
     bkg_burst_hists = []
     for i in range(N_scramble):
         bkg_burst_hist = pbh.estimate_bkg_burst(window_size=window_size, method="scramble", copy=True)
         bkg_burst_hists.append(bkg_burst_hist)
+
+    dump_pickle(bkg_burst_hists, save_bkg+str(window_size)+".pkl")
 
     #Get all unique keys in bkg_burst_hists[:]
     all_bkg_burst_sizes = set(k for dic in bkg_burst_hists for k in dic.keys())
@@ -849,11 +864,48 @@ def test_burst_finding(window_size=3, runNum=55480, nlines=50, N_scramble=3):
     #plt.ylim(0, np.max(sig_burst_hist.values())*1.2)
     #plt.yscale('log')
     plt.legend(loc='best')
-    #plt.show()
     plt.savefig("test_burst_finding_histo_signal_bkg_avg_over"+str(N_scramble)+"scrambles_window"+ str(window_size) +".png")
+    plt.show()
+
+    #plot residual
+    residual_dict={}
+    sig_bkg_burst_sizes = set(k for dic in [sig_burst_hist, avg_bkg_hist] for k in dic.keys())
+    #fill with zero if no burst size count
+    for key_ in sig_bkg_burst_sizes:
+        key_ = int(key_)
+        if key_ not in sig_burst_hist:
+            sig_burst_hist[key_] = 0
+        if key_ not in avg_bkg_hist:
+            avg_bkg_hist[key_] = 0
+        residual_dict[key_] = sig_burst_hist[key_] - avg_bkg_hist[key_]
+
+    plt.figure()
+    plt.errorbar(residual_dict.keys(), residual_dict.values(), xerr=0.5, fmt='bs', capthick=0,
+                 label="Residual " + str(nlines) + " events")
+    plt.title("Window size " + str(window_size) + "s")
+    plt.xlabel("Burst size")
+    plt.ylabel("Counts")
+    #plt.ylim(0, np.max(sig_burst_hist.values())*1.2)
+    #plt.yscale('log')
+    plt.legend(loc='best')
+    plt.savefig("test_burst_finding_histo_residual_over"+str(N_scramble)+"scrambles_window"+ str(window_size) +".png")
+    plt.show()
 
 
     return pbh
+
+
+def load_pickle(f):
+    inputfile = open(f, 'rb')
+    loaded = pickle.load(inputfile)
+    inputfile.close()
+    return loaded
+
+
+def dump_pickle(a, f):
+    output = open(f, 'wb')
+    pickle.dump(a, output, protocol=pickle.HIGHEST_PROTOCOL)
+    output.close()
 
 
 def test1():
@@ -912,7 +964,7 @@ def test2():
 
 if __name__ == "__main__":
     #test_singlet_remover()
-    pbh = test_burst_finding(window_size=1, runNum=55480)
+    pbh = test_burst_finding(window_size=2, runNum=55480, nlines=1000, N_scramble=3)
     #pbh = test_psf_func(Nburst=10, filename=None)
 
     #pbh = test_psf_func_sim(psf_width=0.05, Nsim=10000, prob="psf", Nbins=40, xlim=(0,0.5),
