@@ -382,11 +382,19 @@ class Pbh(object):
         # Master event loop:
         for t in self.photon_df.ts:
             slice_index = np.where((self.photon_df.ts >= t) & (self.photon_df.ts < (t + window_size)))
+            #First remove singlet
+            slice_index = self.singlet_remover(np.array(slice_index[0]))
+            if slice_index is None:
+                #All events are singlet, removed all
+                continue
+
+            slice_index = tuple(slice_index[:, np.newaxis].T)
+
             _N = self.photon_df.ts.values[slice_index].shape[0]
             if _N < 1:
-                print "Should never happen"
-                raise
-            if _N == 1:
+                #All events are singlet, removed all
+                continue
+            elif _N == 1:
                 #a sparse window
                 #self.photon_df.burst_sizes[slice_index] = 1
                 #print "L367", slice_index
@@ -465,6 +473,9 @@ class Pbh(object):
                         mask_[i] = True
                         mask_[j] = True
                         continue
+        ###QF
+        print("removed %d singlet" % sum(mask_==False))
+        print("%d good evts" % slice_index[mask_].shape[0])
         return slice_index[mask_]
 
     def search_event_slice(self, slice_index):
@@ -491,7 +502,7 @@ class Pbh(object):
         #print self.photon_df.psfs.values[tuple(slice_index[:,np.newaxis].T)]
 
         #First remove singlet
-        slice_index = self.singlet_remover(slice_index)
+        #slice_index = self.singlet_remover(slice_index)
         #print slice_index
         if slice_index.shape[0] == 0:
             #all singlets, no bursts, and don't need to check for outliers, go to next event
@@ -546,7 +557,6 @@ class Pbh(object):
         self.burst_dict = self._burst_dict.copy()
         return self.burst_dict
 
-    @jit
     def burst_counting(self):
         """
         :return: nothing but fills self.photon_df.burst_sizes
@@ -579,6 +589,7 @@ class Pbh(object):
     def sig_burst_search(self, window_size=1):
         sig_burst_hist = self.search_time_window(window_size=window_size)
         self.sig_burst_hist = sig_burst_hist
+        return sig_burst_hist
 
     def estimate_bkg_burst(self, window_size=1, method="scramble", copy=True, n_scramble=1):
         """
@@ -944,7 +955,7 @@ def test_burst_finding1(window_size=3, runNum=55480, nlines=100, N_scramble=3,
 
 
 def test_burst_finding(window_size=3, runNum=55480, nlines=100, N_scramble=3,
-                       save_hist="test_burst_finding_histo_window", save_res="test_burst_finding_residual_window"):
+                       save_hist="test_burst_finding_histo", save_res="test_burst_finding_residual"):
     pbh = Pbh()
     pbh.get_TreeWithAllGamma(runNum=runNum, nlines=nlines)
     #do a small list
@@ -953,34 +964,41 @@ def test_burst_finding(window_size=3, runNum=55480, nlines=100, N_scramble=3,
 
     avg_bkg_hist = pbh.estimate_bkg_burst(window_size=window_size, method="scramble", copy=True, n_scramble=N_scramble)
 
-    plt.figure()
-    plt.errorbar(sig_burst_hist.keys(), sig_burst_hist.values(), xerr=0.5, fmt='bs', capthick=0,
+    plt.figure(figsize=(10,8))
+    ax1 = plt.subplot(3,1, (1,2))
+    ax1.errorbar(sig_burst_hist.keys(), sig_burst_hist.values(), xerr=0.5, fmt='bs', capthick=0,
                  label="Data " + str(nlines) + " events")
-    plt.errorbar(avg_bkg_hist.keys(), avg_bkg_hist.values(), xerr=0.5, fmt='rv', capthick=0,
+    ax1.errorbar(avg_bkg_hist.keys(), avg_bkg_hist.values(), xerr=0.5, fmt='rv', capthick=0,
                  label="Background " + str(nlines) + " events")
-    plt.title("Window size " + str(window_size) + "s")
-    plt.xlabel("Burst size")
-    plt.ylabel("Counts")
+    plt.title(str(window_size) + "-s window, "+str(nlines)+ " evts, "+str(N_scramble)+" scrambles")
+    #ax1.set_xlabel("Burst size")
+    ax1.set_ylabel("Counts")
     #plt.ylim(0, np.max(sig_burst_hist.values())*1.2)
     #plt.yscale('log')
+    plt.setp(ax1.get_xticklabels(), visible=False)
     plt.legend(loc='best')
-    plt.savefig(save_hist+ str(window_size) +".png")
-    plt.show()
+    #plt.savefig(save_hist+"_Nevts"+str(nlines)+"_Nscrambles"+str(N_scramble)+"_window"+str(window_size)+".png")
+
+    #plt.show()
 
     #plot residual
     residual_dict=pbh.get_residual_hist()
 
-    plt.figure()
-    plt.errorbar(residual_dict.keys(), residual_dict.values(), xerr=0.5, fmt='bs', capthick=0,
+    #plt.figure()
+    ax2 = plt.subplot(3, 1, 3, sharex=ax1)
+
+    ax2.errorbar(residual_dict.keys(), residual_dict.values(), xerr=0.5, fmt='bs', capthick=0,
                  label="Residual " + str(nlines) + " events")
-    plt.title("Window size " + str(window_size) + "s")
-    plt.xlabel("Burst size")
-    plt.ylabel("Counts")
+    #ax2.title("Window size " + str(window_size) + "s")
+    ax2.set_xlabel("Burst size")
+    ax2.set_ylabel("Counts")
     #plt.ylim(0, np.max(sig_burst_hist.values())*1.2)
     #plt.yscale('log')
     plt.legend(loc='best')
-    plt.savefig(save_res+ str(window_size) +".png")
-    plt.show()
+    #plt.savefig(save_res+"_Nevts"+str(nlines)+"_Nscrambles"+str(N_scramble)+"_window"+str(window_size)+".png")
+    plt.savefig(save_hist+"_Nevts"+str(nlines)+"_Nscrambles"+str(N_scramble)+"_window"+str(window_size)+".png")
+
+    #plt.show()
 
     return pbh
 
@@ -1006,8 +1024,8 @@ def test1():
     psfs = np.ones(10) * 0.1
     centroid = pbh.minimize_centroid_ll(coords, psfs)
 
-    print centroid
-    print centroid.reshape(1, 2)[:, 0], centroid.reshape(1, 2)[:, 1]
+    print(centroid)
+    print(centroid.reshape(1, 2)[:, 0], centroid.reshape(1, 2)[:, 1])
 
     ax = pbh.plot_skymap(coords, [0.1] * 10, [0.2] * 10)
     pbh.plot_skymap(centroid.reshape(1, 2), [0.1], [0.2], ax=ax, color='b', fov_center=fov_center)
@@ -1041,19 +1059,20 @@ def test_singlet_remover(Nburst=10, filename=None, cent_ms=8.0, cent_mew=1.8):
     pbh.read_photon_list(np.arange(10), rand_bkg_coords[:, 0], rand_bkg_coords[:, 1], rand_Es, np.ones(10) * EL)
     slice = np.arange(10)
     slice = pbh.singlet_remover(slice)
-    print slice
+    print(slice)
 
 
 def test2():
     pbh = Pbh()
     pbh.get_TreeWithAllGamma(runNum=55480, nlines=1000)
-    print pbh.photon_df.head()
+    print(pbh.photon_df.head())
     return pbh
 
 
 if __name__ == "__main__":
     #test_singlet_remover()
-    pbh = test_burst_finding(window_size=2, runNum=55480, nlines=1000, N_scramble=3)
+    pbh = test_burst_finding(window_size=1, runNum=55480, nlines=50, N_scramble=1,
+                             save_hist="test_burst_finding_histo", save_res="test_burst_finding_residual")
     #pbh = test_psf_func(Nburst=10, filename=None)
 
     #pbh = test_psf_func_sim(psf_width=0.05, Nsim=10000, prob="psf", Nbins=40, xlim=(0,0.5),
