@@ -424,7 +424,6 @@ class Pbh(object):
         # now count bursts and fill self.photon_df.burst_sizes:
         self.burst_counting()
         burst_hist = self.get_burst_hist()
-        self.sig_burst_hist = burst_hist
         #return self.photon_df.burst_sizes
         return burst_hist
 
@@ -577,20 +576,65 @@ class Pbh(object):
             burst_hist[i] = np.sum(self.photon_df.burst_sizes.values == i) / i
         return burst_hist
 
-    def estimate_bkg_burst(self, window_size=1, method="scramble", copy=True):
+    def sig_burst_search(self, window_size=1):
+        sig_burst_hist = self.search_time_window(window_size=window_size)
+        self.sig_burst_hist = sig_burst_hist
+
+    def estimate_bkg_burst(self, window_size=1, method="scramble", copy=True, n_scramble=1):
         """
         :param method: either "scramble" or "rando"
         :return:
         """
         #Note that from now on we are CHANGING the photon_df!
-        if method == "scramble":
-            self.scramble(copy=copy)
-        elif method == "rando":
-            self.t_rando(copy=copy)
-        bkg_burst_hist = self.search_time_window(window_size=window_size)
-        self.bkg_burst_hist = bkg_burst_hist
-        return bkg_burst_hist
 
+        bkg_burst_hists = []
+        for i in range(n_scramble):
+            #bkg_burst_hist = pbh.estimate_bkg_burst(window_size=window_size)
+            if method == "scramble":
+                self.scramble(copy=copy)
+            elif method == "rando":
+                self.t_rando(copy=copy)
+            bkg_burst_hist = self.search_time_window(window_size=window_size)
+            bkg_burst_hists.append(bkg_burst_hist)
+
+        self.bkg_burst_hists = bkg_burst_hists
+
+        all_bkg_burst_sizes = set(k for dic in bkg_burst_hists for k in dic.keys())
+        #also a dict
+        avg_bkg_hist = {}
+        #avg_bkg_hist_count = {}
+        for key_ in all_bkg_burst_sizes:
+            key_ = int(key_)
+            for d_ in bkg_burst_hists:
+                if key_ in d_:
+                    if key_ in avg_bkg_hist:
+                        avg_bkg_hist[key_] += d_[key_]
+                        #avg_bkg_hist_count[key_] += 1
+                    else:
+                        avg_bkg_hist[int(key_)] = d_[key_]
+                        #avg_bkg_hist_count[int(key_)] = 1
+
+        for k in avg_bkg_hist.keys():
+            #avg_bkg_hist[k] /= avg_bkg_hist_count[k]*1.0
+            avg_bkg_hist[k] /= n_scramble*1.0
+
+        self.avg_bkg_hist = avg_bkg_hist
+        #return bkg_burst_hists, avg_bkg_hist
+        return avg_bkg_hist
+
+    def get_residual_hist(self):
+        residual_dict={}
+        sig_bkg_burst_sizes = set(k for dic in [self.sig_burst_hist, self.avg_bkg_hist] for k in dic.keys())
+        #fill with zero if no burst size count
+        for key_ in sig_bkg_burst_sizes:
+            key_ = int(key_)
+            if key_ not in self.sig_burst_hist:
+                self.sig_burst_hist[key_] = 0
+            if key_ not in self.avg_bkg_hist:
+                self.avg_bkg_hist[key_] = 0
+            residual_dict[key_] = self.sig_burst_hist[key_] - self.avg_bkg_hist[key_]
+        self.residual_dict = residual_dict
+        return residual_dict
 
     def plot_theta2(self, theta2s=np.arange(0, 2, 0.01), psf_width=0.1, N=100, const=1, ax=None, ylog=True):
         const_ = np.ones(theta2s.shape[0]) * const
@@ -802,7 +846,7 @@ def test_sim_likelihood(Nsim=1000, N_burst=3, filename=None, sig_bins=50, bkg_bi
     return pbh
 
 
-def test_burst_finding(window_size=3, runNum=55480, nlines=100, N_scramble=3,
+def test_burst_finding1(window_size=3, runNum=55480, nlines=100, N_scramble=3,
                        save_sig="test_burst_finding_histo_signal_window", save_bkg="test_burst_finding_histo_bkg_window"):
     pbh = Pbh()
     pbh.get_TreeWithAllGamma(runNum=runNum, nlines=nlines)
@@ -830,6 +874,7 @@ def test_burst_finding(window_size=3, runNum=55480, nlines=100, N_scramble=3,
     for i in range(N_scramble):
         bkg_burst_hist = pbh.estimate_bkg_burst(window_size=window_size, method="scramble", copy=True)
         bkg_burst_hists.append(bkg_burst_hist)
+
 
     dump_pickle(bkg_burst_hists, save_bkg+str(window_size)+".pkl")
 
@@ -891,9 +936,53 @@ def test_burst_finding(window_size=3, runNum=55480, nlines=100, N_scramble=3,
     plt.savefig("test_burst_finding_histo_residual_over"+str(N_scramble)+"scrambles_window"+ str(window_size) +".png")
     plt.show()
 
-
     return pbh
 
+
+
+
+
+
+def test_burst_finding(window_size=3, runNum=55480, nlines=100, N_scramble=3,
+                       save_hist="test_burst_finding_histo_window", save_res="test_burst_finding_residual_window"):
+    pbh = Pbh()
+    pbh.get_TreeWithAllGamma(runNum=runNum, nlines=nlines)
+    #do a small list
+    #pbh.photon_df = pbh.photon_df[:nlines]
+    sig_burst_hist = pbh.sig_burst_search(window_size=window_size)
+
+    avg_bkg_hist = pbh.estimate_bkg_burst(window_size=window_size, method="scramble", copy=True, n_scramble=N_scramble)
+
+    plt.figure()
+    plt.errorbar(sig_burst_hist.keys(), sig_burst_hist.values(), xerr=0.5, fmt='bs', capthick=0,
+                 label="Data " + str(nlines) + " events")
+    plt.errorbar(avg_bkg_hist.keys(), avg_bkg_hist.values(), xerr=0.5, fmt='rv', capthick=0,
+                 label="Background " + str(nlines) + " events")
+    plt.title("Window size " + str(window_size) + "s")
+    plt.xlabel("Burst size")
+    plt.ylabel("Counts")
+    #plt.ylim(0, np.max(sig_burst_hist.values())*1.2)
+    #plt.yscale('log')
+    plt.legend(loc='best')
+    plt.savefig(save_hist+ str(window_size) +".png")
+    plt.show()
+
+    #plot residual
+    residual_dict=pbh.get_residual_hist()
+
+    plt.figure()
+    plt.errorbar(residual_dict.keys(), residual_dict.values(), xerr=0.5, fmt='bs', capthick=0,
+                 label="Residual " + str(nlines) + " events")
+    plt.title("Window size " + str(window_size) + "s")
+    plt.xlabel("Burst size")
+    plt.ylabel("Counts")
+    #plt.ylim(0, np.max(sig_burst_hist.values())*1.2)
+    #plt.yscale('log')
+    plt.legend(loc='best')
+    plt.savefig(save_res+ str(window_size) +".png")
+    plt.show()
+
+    return pbh
 
 def load_pickle(f):
     inputfile = open(f, 'rb')
