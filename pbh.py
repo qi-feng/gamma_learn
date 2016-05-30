@@ -176,7 +176,8 @@ class Pbh(object):
         self._burst_dict = {}
         # print self.photon_df.head()
         #print self.photon_df.ts.shape, self.photon_df.ts
-        return self.photon_df.ts
+        #sort!
+        return ts_
 
     def t_rando(self, copy=False):
         """
@@ -378,13 +379,28 @@ class Pbh(object):
         assert hasattr(self,
                        'photon_df'), "photon_df doesn't exist, read data first (read_photon_list or get_TreeWithAllGamma)"
         if len(self._burst_dict) != 0:
-            print "You started a burst search while there are already things in _burst_dict,  "
+            print "You started a burst search while there are already things in _burst_dict, now make it empty"
+            self._burst_dict = {}
+        previous_window_start = -1.0
+        previous_window_end = -1.0
         # Master event loop:
         for t in self.photon_df.ts:
+            if previous_window_start == -1.0:
+                #first event:
+                previous_window_start = t
+                previous_window_end = t + window_size
+            else:
+                new_event_slice_tuple = np.where((self.photon_df.ts >= previous_window_end) & (self.photon_df.ts < (t + window_size)))
+                if len(new_event_slice_tuple[0]) == 0:
+                    #no new events in the extra window, continue
+                    continue
             slice_index = np.where((self.photon_df.ts >= t) & (self.photon_df.ts < (t + window_size)))
             #First remove singlet
             slice_index = self.singlet_remover(np.array(slice_index[0]))
             if slice_index is None:
+                #All events are singlet, removed all
+                continue
+            elif len(slice_index) == 0:
                 #All events are singlet, removed all
                 continue
 
@@ -433,7 +449,7 @@ class Pbh(object):
         self.burst_counting()
         burst_hist = self.get_burst_hist()
         #return self.photon_df.burst_sizes
-        return burst_hist
+        return burst_hist, self._burst_dict
 
     @jit
     def singlet_remover(self, slice_index):
@@ -587,11 +603,12 @@ class Pbh(object):
         return burst_hist
 
     def sig_burst_search(self, window_size=1):
-        sig_burst_hist = self.search_time_window(window_size=window_size)
-        self.sig_burst_hist = sig_burst_hist
-        return sig_burst_hist
+        _sig_burst_hist, _sig_burst_dict = self.search_time_window(window_size=window_size)
+        self.sig_burst_hist = _sig_burst_hist.copy()
+        self.sig_burst_dict = _sig_burst_dict.copy()
+        return self.sig_burst_hist, self.sig_burst_dict
 
-    def estimate_bkg_burst(self, window_size=1, method="scramble", copy=True, n_scramble=1):
+    def estimate_bkg_burst(self, window_size=1, method="scramble", copy=True, n_scramble=1, return_burst_dict=False):
         """
         :param method: either "scramble" or "rando"
         :return:
@@ -599,16 +616,19 @@ class Pbh(object):
         #Note that from now on we are CHANGING the photon_df!
 
         bkg_burst_hists = []
+        bkg_burst_dicts = []
         for i in range(n_scramble):
             #bkg_burst_hist = pbh.estimate_bkg_burst(window_size=window_size)
             if method == "scramble":
                 self.scramble(copy=copy)
             elif method == "rando":
                 self.t_rando(copy=copy)
-            bkg_burst_hist = self.search_time_window(window_size=window_size)
+            bkg_burst_hist, bkg_burst_dict = self.search_time_window(window_size=window_size)
             bkg_burst_hists.append(bkg_burst_hist)
+            if return_burst_dict:
+                bkg_burst_dicts.append(bkg_burst_dict)
 
-        self.bkg_burst_hists = bkg_burst_hists
+        self.bkg_burst_hists = bkg_burst_hists.copy()
 
         all_bkg_burst_sizes = set(k for dic in bkg_burst_hists for k in dic.keys())
         #also a dict
@@ -629,9 +649,11 @@ class Pbh(object):
             #avg_bkg_hist[k] /= avg_bkg_hist_count[k]*1.0
             avg_bkg_hist[k] /= n_scramble*1.0
 
-        self.avg_bkg_hist = avg_bkg_hist
+        self.avg_bkg_hist = avg_bkg_hist.copy()
         #return bkg_burst_hists, avg_bkg_hist
-        return avg_bkg_hist
+        if return_burst_dict:
+            return self.avg_bkg_hist, bkg_burst_dicts
+        return self.avg_bkg_hist
 
     def get_residual_hist(self):
         residual_dict={}
@@ -858,12 +880,12 @@ def test_sim_likelihood(Nsim=1000, N_burst=3, filename=None, sig_bins=50, bkg_bi
 
 
 def test_burst_finding1(window_size=3, runNum=55480, nlines=100, N_scramble=3,
-                       save_sig="test_burst_finding_histo_signal_window", save_bkg="test_burst_finding_histo_bkg_window"):
+                       save_hist="test_burst_finding_histo_signal_window", save_bkg="test_burst_finding_histo_bkg_window"):
     pbh = Pbh()
     pbh.get_TreeWithAllGamma(runNum=runNum, nlines=nlines)
     #do a small list
     #pbh.photon_df = pbh.photon_df[:nlines]
-    sig_burst_hist = pbh.search_time_window(window_size=window_size)
+    sig_burst_hist, _ = pbh.search_time_window(window_size=window_size)
     #sig_burst_hist is actually a dictionary
     plotSig=False
     if plotSig:
@@ -877,7 +899,7 @@ def test_burst_finding1(window_size=3, runNum=55480, nlines=100, N_scramble=3,
         plt.savefig("test_burst_finding_histo_signal_window" + str(window_size) + "s.png")
         plt.show()
 
-    dump_pickle(sig_burst_hist, save_sig+str(window_size)+".pkl")
+    dump_pickle(sig_burst_hist, save_hist+str(window_size)+".pkl")
 
     #now scramble:
     #N_scramble = 3
@@ -954,15 +976,17 @@ def test_burst_finding1(window_size=3, runNum=55480, nlines=100, N_scramble=3,
 
 
 
-def test_burst_finding(window_size=3, runNum=55480, nlines=100, N_scramble=3,
+def test_burst_finding(window_size=3, runNum=55480, nlines=100, N_scramble=3, plt_log=True,
                        save_hist="test_burst_finding_histo", save_res="test_burst_finding_residual"):
     pbh = Pbh()
     pbh.get_TreeWithAllGamma(runNum=runNum, nlines=nlines)
     #do a small list
     #pbh.photon_df = pbh.photon_df[:nlines]
-    sig_burst_hist = pbh.sig_burst_search(window_size=window_size)
+    sig_burst_hist, sig_burst_dict = pbh.sig_burst_search(window_size=window_size)
 
-    avg_bkg_hist = pbh.estimate_bkg_burst(window_size=window_size, method="scramble", copy=True, n_scramble=N_scramble)
+    #avg_bkg_hist = pbh.estimate_bkg_burst(window_size=window_size, method="scramble", copy=True, n_scramble=N_scramble)
+    avg_bkg_hist, bkg_burst_hists = pbh.estimate_bkg_burst(window_size=window_size, method="scramble",
+                                                           copy=True, n_scramble=N_scramble, return_burst_dict=True)
 
     plt.figure(figsize=(10,8))
     ax1 = plt.subplot(3,1, (1,2))
@@ -974,7 +998,8 @@ def test_burst_finding(window_size=3, runNum=55480, nlines=100, N_scramble=3,
     #ax1.set_xlabel("Burst size")
     ax1.set_ylabel("Counts")
     #plt.ylim(0, np.max(sig_burst_hist.values())*1.2)
-    #plt.yscale('log')
+    if plt_log:
+        plt.yscale('log')
     plt.setp(ax1.get_xticklabels(), visible=False)
     plt.legend(loc='best')
     #plt.savefig(save_hist+"_Nevts"+str(nlines)+"_Nscrambles"+str(N_scramble)+"_window"+str(window_size)+".png")
@@ -1071,7 +1096,7 @@ def test2():
 
 if __name__ == "__main__":
     #test_singlet_remover()
-    pbh = test_burst_finding(window_size=1, runNum=55480, nlines=50, N_scramble=1,
+    pbh = test_burst_finding(window_size=1, runNum=55480, nlines=200, N_scramble=1,
                              save_hist="test_burst_finding_histo", save_res="test_burst_finding_residual")
     #pbh = test_psf_func(Nburst=10, filename=None)
 
