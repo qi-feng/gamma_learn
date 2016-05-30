@@ -1012,9 +1012,7 @@ def test_burst_finding1(window_size=3, runNum=55480, nlines=None, N_scramble=3,
 
 
 
-
-
-def test_burst_finding(window_size=3, runNum=55480, nlines=100, N_scramble=3, plt_log=True, verbose=False,
+def test_burst_finding(window_size=3, runNum=55480, nlines=None, N_scramble=3, plt_log=True, verbose=False,
                        save_hist="test_burst_finding_histo", save_res="test_burst_finding_residual"):
     pbh = Pbh()
     pbh.get_TreeWithAllGamma(runNum=runNum, nlines=nlines)
@@ -1025,11 +1023,10 @@ def test_burst_finding(window_size=3, runNum=55480, nlines=100, N_scramble=3, pl
     #avg_bkg_hist = pbh.estimate_bkg_burst(window_size=window_size, method="scramble", copy=True, n_scramble=N_scramble)
     avg_bkg_hist, bkg_burst_hists = pbh.estimate_bkg_burst(window_size=window_size, method="scramble",
                                                            copy=True, n_scramble=N_scramble, return_burst_dict=True, verbose=verbose)
-    sig_burst_hist, sig_burst_dict = pbh.sig_burst_search(window_size=window_size, verbose=verbose)
 
-    #avg_bkg_hist = pbh.estimate_bkg_burst(window_size=window_size, method="scramble", copy=True, n_scramble=N_scramble)
-    avg_bkg_hist, bkg_burst_hists = pbh.estimate_bkg_burst(window_size=window_size, method="scramble",
-                                                           copy=True, n_scramble=N_scramble, return_burst_dict=True, verbose=verbose)
+    dump_pickle(sig_burst_hist, save_hist+str(window_size)+"_sig_hist.pkl")
+    dump_pickle(bkg_burst_hists, save_hist+str(window_size)+"_bkg_hists.pkl")
+
 
     plt.figure(figsize=(10,8))
     ax1 = plt.subplot(3,1, (1,2))
@@ -1139,7 +1136,7 @@ def test2():
 
 if __name__ == "__main__":
     #test_singlet_remover()
-    pbh = test_burst_finding(window_size=1, runNum=55480, nlines=200, N_scramble=1,
+    pbh = test_burst_finding(window_size=1, runNum=55480, nlines=None, N_scramble=5,
                              save_hist="test_burst_finding_histo", save_res="test_burst_finding_residual")
     #pbh = test_psf_func(Nburst=10, filename=None)
 
