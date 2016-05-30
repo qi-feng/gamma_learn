@@ -95,16 +95,16 @@ class Pbh(object):
         :return: nothing but fills photon_df, except photon_df.burst_sizes
         """
         if not hasattr(self, 'Rfile'):
-            print "No file has been read."
+            print("No file has been read.")
             if runNum is not None:
                 try:
                     self.readEDfile(runNum=runNum)
-                    print "Read file " + self.filename + "..."
+                    print("Read file " + self.filename + "...")
                 except:
-                    print "Can't read file with runNum " + str(runNum)
+                    print("Can't read file with runNum " + str(runNum))
                     raise
             else:
-                print "Run self.readEDfile(\"rootfile\") first; or provide a runNum"
+                print("Run self.readEDfile(\"rootfile\") first; or provide a runNum")
                 raise
         all_gamma_treeName = "run_" + str(self.runNum) + "/stereo/TreeWithAllGamma"
         # pointingData_treeName = "run_"+str(self.runNum)+"/stereo/pointingDataReduced"
@@ -124,6 +124,7 @@ class Pbh(object):
                            columns=columns)
         ###QF short breaker:
         breaker = 0
+        i_gamma = 0
         for i, event in enumerate(all_gamma_tree):
             if nlines is not None:
                 if breaker >= nlines:
@@ -131,9 +132,11 @@ class Pbh(object):
                 breaker += 1
             #time_index=np.argmax(ptTime>event.Time)
             #making cut:
-            if event.Energy < E_lo_cut or event.Energy > E_hi_cut or event.TelElevation < EL_lo_cut:
+            #this is quite essential to double check!!!
+            if event.Energy < E_lo_cut or event.Energy > E_hi_cut or event.TelElevation < EL_lo_cut or event.IsGamma==0:
                 df_.fail_cut.at[i] = 1
                 continue
+            i_gamma += 1
             # fill the pandas dataframe
             df_.MJDs[i] = event.dayMJD
             #df_.eventNumber[i] = event.eventNumber
@@ -143,6 +146,7 @@ class Pbh(object):
             df_.Es[i] = event.Energy
             df_.ELs[i] = event.TelElevation
 
+        print("There are %d events, %d of which are gamma-like" % (N_,i_gamma))
         #df_.coords = np.concatenate([df_.RAs.reshape(N_,1), df_.Decs.reshape(N_,1)], axis=1)
         df_.psfs = np.zeros(N_)
         # by def all events are at least a singlet
@@ -367,7 +371,7 @@ class Pbh(object):
             #print "returning outlier events", slice_index[outlier_index]
             return centroid, ll_centroid, slice_index[mask], slice_index[outlier_index]
 
-    def search_time_window(self, window_size=1):
+    def search_time_window(self, window_size=1, verbose=False):
         """
         Start a burst search for the given window_size in photon_df
         _burst_dict needs to be clean for a new scramble
@@ -383,42 +387,71 @@ class Pbh(object):
             self._burst_dict = {}
         previous_window_start = -1.0
         previous_window_end = -1.0
+        previous_singlets = np.array([])
         # Master event loop:
         for t in self.photon_df.ts:
+            if verbose:
+                print("Starting at the event at %.5f" % t)
             if previous_window_start == -1.0:
                 #first event:
                 previous_window_start = t
                 previous_window_end = t + window_size
             else:
                 new_event_slice_tuple = np.where((self.photon_df.ts >= previous_window_end) & (self.photon_df.ts < (t + window_size)))
+                previous_window_start = t
+                previous_window_end = t + window_size
                 if len(new_event_slice_tuple[0]) == 0:
                     #no new events in the extra window, continue
+                    if verbose:
+                        print("no new events found, skipping to next event")
                     continue
+
+            #1. slice events between t and t+window_size
             slice_index = np.where((self.photon_df.ts >= t) & (self.photon_df.ts < (t + window_size)))
-            #First remove singlet
-            slice_index = self.singlet_remover(np.array(slice_index[0]))
+
+            #2. remove singlets
+            slice_index, singlet_slice_index = self.singlet_remover(np.array(slice_index[0]))
+
             if slice_index is None:
+                if verbose:
+                    print("All events are singlet in this time window")
                 #All events are singlet, removed all
                 continue
             elif len(slice_index) == 0:
+                if verbose:
+                    print("All events are singlet in this time window")
                 #All events are singlet, removed all
                 continue
+
+            #check if all new events are singlets:
+            if np.in1d(singlet_slice_index, previous_singlets).all():
+                previous_singlets=singlet_slice_index
+                continue
+            previous_singlets=singlet_slice_index
 
             slice_index = tuple(slice_index[:, np.newaxis].T)
 
             _N = self.photon_df.ts.values[slice_index].shape[0]
             if _N < 1:
                 #All events are singlet, removed all
+                if verbose:
+                    print("Can't reach here")
                 continue
             elif _N == 1:
                 #a sparse window
                 #self.photon_df.burst_sizes[slice_index] = 1
                 #print "L367", slice_index
                 #self.photon_df.at[slice_index[0], 'burst_sizes'] = 1
+                if verbose:
+                    print("Can't reach here")
                 continue
+
+            #3. burst searching (in angular window)
             burst_events, outlier_events = self.search_event_slice(np.array(slice_index[0]))
             if outlier_events is None:
                 #All events of slice_index form a burst, no outliers; or all events are singlet
+                if verbose:
+                    print("All events form 1 burst")
                 continue
             #elif len(outlier_events)==1:
             elif outlier_events.shape[0] == 1:
@@ -433,7 +466,8 @@ class Pbh(object):
 
                 while outlier_of_outlier_events is not None:
                     ###QF
-                    #print "loop through the outliers "
+                    if verbose:
+                        print("looping through the outliers ")
                     #loop until no outliers are left unprocessed
                     if len(outlier_of_outlier_events) <= 1:
                         #self.photon_df.burst_sizes[outlier_of_outlier_events[0]] = 1
@@ -446,8 +480,12 @@ class Pbh(object):
                             outlier_of_outlier_events)
         # the end of master event loop, self._burst_dict is filled
         # now count bursts and fill self.photon_df.burst_sizes:
+        if verbose:
+            print("Counting bursts")
         self.burst_counting()
         burst_hist = self.get_burst_hist()
+        if verbose:
+            print("Found bursts: %s"%burst_hist)
         #return self.photon_df.burst_sizes
         return burst_hist, self._burst_dict
 
@@ -455,14 +493,14 @@ class Pbh(object):
     def singlet_remover(self, slice_index):
         """
         :param slice_index: a np array of events' indices in photon_df
-        :return: new slice_index with singlets (no neighbors in a radius of 5*psf) removed;
-                 return None if all events are singlets
+        :return: new slice_index with singlets (no neighbors in a radius of 5*psf) removed, and a slice of singlets;
+                 return None and input slice if all events are singlets
         """
         if slice_index.shape[0] == 1:
             #one event, singlet by definition:
             #return Nones
             #self.photon_df.at[slice_index[0], 'burst_sizes'] = 1
-            return None
+            return None, slice_index
         N_ = self.photon_df.shape[0]
         slice_tuple = tuple(slice_index[:, np.newaxis].T)
         coord_slice = np.concatenate([self.photon_df.RAs.reshape(N_, 1), self.photon_df.Decs.reshape(N_, 1)], axis=1)[
@@ -492,7 +530,7 @@ class Pbh(object):
         ###QF
         print("removed %d singlet" % sum(mask_==False))
         print("%d good evts" % slice_index[mask_].shape[0])
-        return slice_index[mask_]
+        return slice_index[mask_], slice_index[np.invert(mask_)]
 
     def search_event_slice(self, slice_index):
         """
@@ -602,13 +640,13 @@ class Pbh(object):
             burst_hist[i] = np.sum(self.photon_df.burst_sizes.values == i) / i
         return burst_hist
 
-    def sig_burst_search(self, window_size=1):
-        _sig_burst_hist, _sig_burst_dict = self.search_time_window(window_size=window_size)
+    def sig_burst_search(self, window_size=1, verbose=False):
+        _sig_burst_hist, _sig_burst_dict = self.search_time_window(window_size=window_size, verbose=verbose)
         self.sig_burst_hist = _sig_burst_hist.copy()
         self.sig_burst_dict = _sig_burst_dict.copy()
         return self.sig_burst_hist, self.sig_burst_dict
 
-    def estimate_bkg_burst(self, window_size=1, method="scramble", copy=True, n_scramble=1, return_burst_dict=False):
+    def estimate_bkg_burst(self, window_size=1, method="scramble", copy=True, n_scramble=1, return_burst_dict=False, verbose=False):
         """
         :param method: either "scramble" or "rando"
         :return:
@@ -623,7 +661,7 @@ class Pbh(object):
                 self.scramble(copy=copy)
             elif method == "rando":
                 self.t_rando(copy=copy)
-            bkg_burst_hist, bkg_burst_dict = self.search_time_window(window_size=window_size)
+            bkg_burst_hist, bkg_burst_dict = self.search_time_window(window_size=window_size, verbose=verbose)
             bkg_burst_hists.append(bkg_burst_hist)
             if return_burst_dict:
                 bkg_burst_dicts.append(bkg_burst_dict)
@@ -879,7 +917,7 @@ def test_sim_likelihood(Nsim=1000, N_burst=3, filename=None, sig_bins=50, bkg_bi
     return pbh
 
 
-def test_burst_finding1(window_size=3, runNum=55480, nlines=100, N_scramble=3,
+def test_burst_finding1(window_size=3, runNum=55480, nlines=None, N_scramble=3,
                        save_hist="test_burst_finding_histo_signal_window", save_bkg="test_burst_finding_histo_bkg_window"):
     pbh = Pbh()
     pbh.get_TreeWithAllGamma(runNum=runNum, nlines=nlines)
@@ -976,17 +1014,22 @@ def test_burst_finding1(window_size=3, runNum=55480, nlines=100, N_scramble=3,
 
 
 
-def test_burst_finding(window_size=3, runNum=55480, nlines=100, N_scramble=3, plt_log=True,
+def test_burst_finding(window_size=3, runNum=55480, nlines=100, N_scramble=3, plt_log=True, verbose=False,
                        save_hist="test_burst_finding_histo", save_res="test_burst_finding_residual"):
     pbh = Pbh()
     pbh.get_TreeWithAllGamma(runNum=runNum, nlines=nlines)
     #do a small list
     #pbh.photon_df = pbh.photon_df[:nlines]
-    sig_burst_hist, sig_burst_dict = pbh.sig_burst_search(window_size=window_size)
+    sig_burst_hist, sig_burst_dict = pbh.sig_burst_search(window_size=window_size, verbose=verbose)
 
     #avg_bkg_hist = pbh.estimate_bkg_burst(window_size=window_size, method="scramble", copy=True, n_scramble=N_scramble)
     avg_bkg_hist, bkg_burst_hists = pbh.estimate_bkg_burst(window_size=window_size, method="scramble",
-                                                           copy=True, n_scramble=N_scramble, return_burst_dict=True)
+                                                           copy=True, n_scramble=N_scramble, return_burst_dict=True, verbose=verbose)
+    sig_burst_hist, sig_burst_dict = pbh.sig_burst_search(window_size=window_size, verbose=verbose)
+
+    #avg_bkg_hist = pbh.estimate_bkg_burst(window_size=window_size, method="scramble", copy=True, n_scramble=N_scramble)
+    avg_bkg_hist, bkg_burst_hists = pbh.estimate_bkg_burst(window_size=window_size, method="scramble",
+                                                           copy=True, n_scramble=N_scramble, return_burst_dict=True, verbose=verbose)
 
     plt.figure(figsize=(10,8))
     ax1 = plt.subplot(3,1, (1,2))
@@ -1083,7 +1126,7 @@ def test_singlet_remover(Nburst=10, filename=None, cent_ms=8.0, cent_mew=1.8):
 
     pbh.read_photon_list(np.arange(10), rand_bkg_coords[:, 0], rand_bkg_coords[:, 1], rand_Es, np.ones(10) * EL)
     slice = np.arange(10)
-    slice = pbh.singlet_remover(slice)
+    slice, singlet_slice = pbh.singlet_remover(slice)
     print(slice)
 
 
