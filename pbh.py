@@ -666,7 +666,7 @@ class Pbh(object):
             if return_burst_dict:
                 bkg_burst_dicts.append(bkg_burst_dict)
 
-        self.bkg_burst_hists = bkg_burst_hists.copy()
+        self.bkg_burst_hists = bkg_burst_hists
 
         all_bkg_burst_sizes = set(k for dic in bkg_burst_hists for k in dic.keys())
         #also a dict
