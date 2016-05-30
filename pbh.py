@@ -123,13 +123,13 @@ class Pbh(object):
         df_ = pd.DataFrame(np.array([np.zeros(N_)] * len(columns)).T,
                            columns=columns)
         ###QF short breaker:
-        breaker = 0
+        #breaker = 0
         i_gamma = 0
         for i, event in enumerate(all_gamma_tree):
-            if nlines is not None:
-                if breaker >= nlines:
-                    break
-                breaker += 1
+            #if nlines is not None:
+            #    if breaker >= nlines:
+            #        break
+            #    breaker += 1
             #time_index=np.argmax(ptTime>event.Time)
             #making cut:
             #this is quite essential to double check!!!
@@ -1027,7 +1027,9 @@ def test_burst_finding(window_size=3, runNum=55480, nlines=None, N_scramble=3, p
     dump_pickle(sig_burst_hist, save_hist+str(window_size)+"_sig_hist.pkl")
     dump_pickle(bkg_burst_hists, save_hist+str(window_size)+"_bkg_hists.pkl")
 
-
+    if nlines is None:
+        nlines='all'
+        
     plt.figure(figsize=(10,8))
     ax1 = plt.subplot(3,1, (1,2))
     ax1.errorbar(sig_burst_hist.keys(), sig_burst_hist.values(), xerr=0.5, fmt='bs', capthick=0,
@@ -1062,7 +1064,7 @@ def test_burst_finding(window_size=3, runNum=55480, nlines=None, N_scramble=3, p
     plt.legend(loc='best')
     #plt.savefig(save_res+"_Nevts"+str(nlines)+"_Nscrambles"+str(N_scramble)+"_window"+str(window_size)+".png")
     plt.savefig(save_hist+"_Nevts"+str(nlines)+"_Nscrambles"+str(N_scramble)+"_window"+str(window_size)+".png")
-
+    print("Done!")
     #plt.show()
 
     return pbh
