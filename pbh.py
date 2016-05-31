@@ -927,7 +927,7 @@ def test_sim_likelihood(Nsim=1000, N_burst=3, filename=None, sig_bins=50, bkg_bi
 
 
 def test_burst_finding(window_size=3, runNum=55480, nlines=None, N_scramble=3, plt_log=True, verbose=False,
-                       save_hist="test_burst_finding_histo", save_res="test_burst_finding_residual"):
+                       save_hist="test_burst_finding_histo", bkg_method="scramble"):
     pbh = Pbh()
     pbh.get_TreeWithAllGamma(runNum=runNum, nlines=nlines)
     #do a small list
@@ -935,7 +935,7 @@ def test_burst_finding(window_size=3, runNum=55480, nlines=None, N_scramble=3, p
     sig_burst_hist, sig_burst_dict = pbh.sig_burst_search(window_size=window_size, verbose=verbose)
 
     #avg_bkg_hist = pbh.estimate_bkg_burst(window_size=window_size, method="scramble", copy=True, n_scramble=N_scramble)
-    avg_bkg_hist, bkg_burst_dicts = pbh.estimate_bkg_burst(window_size=window_size, method="scramble",
+    avg_bkg_hist, bkg_burst_dicts = pbh.estimate_bkg_burst(window_size=window_size, method=bkg_method,
                                                            copy=True, n_scramble=N_scramble, return_burst_dict=True, verbose=verbose)
 
     dump_pickle(sig_burst_hist, save_hist+str(window_size)+"_sig_hist.pkl")
@@ -951,34 +951,29 @@ def test_burst_finding(window_size=3, runNum=55480, nlines=None, N_scramble=3, p
                  label="Data " + str(nlines) + " events")
     ax1.errorbar(avg_bkg_hist.keys(), avg_bkg_hist.values(), xerr=0.5, fmt='rv', capthick=0,
                  label="Background " + str(nlines) + " events")
-    plt.title(str(window_size) + "-s window, "+str(nlines)+ " evts, "+str(N_scramble)+" scrambles")
-    #ax1.set_xlabel("Burst size")
+    plt.title(str(window_size) + "-s window, "+str(nlines)+ " evts, "+str(N_scramble)+" bootstraps")
     ax1.set_ylabel("Counts")
     #plt.ylim(0, np.max(sig_burst_hist.values())*1.2)
     if plt_log:
         plt.yscale('log')
     plt.setp(ax1.get_xticklabels(), visible=False)
     plt.legend(loc='best')
-    #plt.savefig(save_hist+"_Nevts"+str(nlines)+"_Nscrambles"+str(N_scramble)+"_window"+str(window_size)+".png")
-
-    #plt.show()
 
     #plot residual
     residual_dict=pbh.get_residual_hist()
 
     #plt.figure()
     ax2 = plt.subplot(3, 1, 3, sharex=ax1)
-
     ax2.errorbar(residual_dict.keys(), residual_dict.values(), xerr=0.5, fmt='bs', capthick=0,
                  label="Residual " + str(nlines) + " events")
-    #ax2.title("Window size " + str(window_size) + "s")
     ax2.set_xlabel("Burst size")
     ax2.set_ylabel("Counts")
     #plt.ylim(0, np.max(sig_burst_hist.values())*1.2)
     #plt.yscale('log')
     plt.legend(loc='best')
-    #plt.savefig(save_res+"_Nevts"+str(nlines)+"_Nscrambles"+str(N_scramble)+"_window"+str(window_size)+".png")
-    plt.savefig(save_hist+"_Nevts"+str(nlines)+"_Nscrambles"+str(N_scramble)+"_window"+str(window_size)+".png")
+
+    plt.savefig(save_hist+"_Nevts"+str(nlines)+"_Nscrambles"+str(N_scramble)+"_window"+str(window_size)+"_method_"+str(bkg_method)+".png")
+    #plt.savefig(save_hist+"_Nevts"+str(nlines)+"_Nscrambles"+str(N_scramble)+"_window"+str(window_size)+".png")
     print("Done!")
     #plt.show()
 
