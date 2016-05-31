@@ -658,6 +658,8 @@ class Pbh(object):
         :return: nothing but fills self.photon_df.burst_sizes, during the process self._burst_dict is emptied!
         """
         # Only to be called after self._burst_dict is filled
+        # initialize burst sizes
+        self.photon_df.at[:, 'burst_sizes'] = 1
         # Find the largest burst
         largest_burst_number = max(self._burst_dict, key=lambda x: len(set(self._burst_dict[x])))
         for evt in self._burst_dict[largest_burst_number]:
