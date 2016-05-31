@@ -208,7 +208,40 @@ class Pbh(object):
                     print "Tried 100 times and can't draw a rando wait time that's larger than VERITAS deadtime,"
                     print "you'd better check your time unit or something..."
             self.photon_df.ts.at[i + 1] = self.photon_df.ts[i] + _rando_delta_t
+        #naturally sorted
+        # re-init _burst_dict for counting
+        self._burst_dict = {}
         return self.photon_df.ts
+
+    def t_rando(self, copy=False):
+        """
+        throw Poisson distr. ts based on the original ts,
+        use 1/delta_t as the expected Poisson rate for each event
+        """
+        if not hasattr(self, 'photon_df'):
+            print "Call get_TreeWithAllGamma first..."
+        if copy:
+            # if you want to keep the original burst_dict, this should only happen at the 1st scramble
+            if not hasattr(self, 'photon_df_orig'):
+                self.photon_df_orig = self.photon_df.copy()
+        delta_ts = np.diff(self.photon_df.ts)
+        for i, _delta_t in enumerate(delta_ts):
+            # draw a rando!
+            _rando_delta_t = np.random.exponential(1. / _delta_t)
+            inf_loop_preventer = 0
+            inf_loop_bound = 100
+            while _rando_delta_t < self.VERITAS_deadtime:
+                _rando_delta_t = np.random.exponential(1. / _delta_t)
+                inf_loop_preventer += 1
+                if inf_loop_preventer > inf_loop_bound:
+                    print "Tried 100 times and can't draw a rando wait time that's larger than VERITAS deadtime,"
+                    print "you'd better check your time unit or something..."
+            self.photon_df.ts.at[i + 1] = self.photon_df.ts[i] + _rando_delta_t
+        #naturally sorted
+        # re-init _burst_dict for counting
+        self._burst_dict = {}
+        return self.photon_df.ts
+
 
     @jit
     def psf_func(self, theta2, psf_width, N=100):
@@ -671,9 +704,9 @@ class Pbh(object):
             elif method == "rando":
                 self.t_rando(copy=copy)
             bkg_burst_hist, bkg_burst_dict = self.search_time_window(window_size=window_size, verbose=verbose)
-            bkg_burst_hists.append(bkg_burst_hist)
+            bkg_burst_hists.append(bkg_burst_hist.copy())
             if return_burst_dict:
-                bkg_burst_dicts.append(bkg_burst_dict)
+                bkg_burst_dicts.append(bkg_burst_dict.copy())
 
         self.bkg_burst_hists = bkg_burst_hists
 
@@ -715,6 +748,62 @@ class Pbh(object):
             residual_dict[key_] = self.sig_burst_hist[key_] - self.avg_bkg_hist[key_]
         self.residual_dict = residual_dict
         return residual_dict
+
+    def plot_burst_hist(self, filename=None, title="Burst histogram", plt_log=True, error="Poisson"):
+        if not hasattr(self,'sig_burst_hist'):
+            print("self.sig_burst_hist doesn't exist, what to plot?")
+            return None
+        if not hasattr(self,'avg_bkg_hist'):
+            print("self.avg_bkg_hist doesn't exist, what to plot?")
+            return None
+
+        plt.figure(figsize=(10,8))
+        ax1 = plt.subplot(3,1, (1,2))
+        if error is None:
+            sig_err = np.zeros(np.array(self.sig_burst_hist.values()).shape[0])
+            bkg_err = np.zeros(np.array(self.avg_bkg_hist.values()).hape[0])
+        elif error=="Poisson":
+            sig_err = np.sqrt(np.array(self.sig_burst_hist.values()).astype('float'))
+            bkg_err = np.sqrt(np.array(self.avg_bkg_hist.values()).astype('float'))
+        elif error.lower()=="std":
+            sig_err = np.sqrt(np.array(self.sig_burst_hist.values()).astype('float'))
+            all_bkg_burst_sizes = set(k for dic in self.bkg_burst_hists for k in dic.keys())
+            bkg_err = np.zeros(sig_err.shape[0])
+            for key_ in all_bkg_burst_sizes:
+                key_ = float(key_)
+                bkg_err[key_] = np.std(np.array([d[key_] for d in self.bkg_burst_hists if key_ in d]))
+
+        ax1.errorbar(self.sig_burst_hist.keys(), self.sig_burst_hist.values(), xerr=0.5,
+                         yerr=sig_err, fmt='bs', capthick=0,
+                         label="Data")
+        ax1.errorbar(self.avg_bkg_hist.keys(), self.avg_bkg_hist.values(), xerr=0.5,
+                         yerr=bkg_err, fmt='rv', capthick=0,
+                         label="Background")
+        plt.title(title)
+        ax1.set_ylabel("Counts")
+        #plt.ylim(0, np.max(sig_burst_hist.values())*1.2)
+        if plt_log:
+            plt.yscale('log')
+        plt.setp(ax1.get_xticklabels(), visible=False)
+        plt.legend(loc='best')
+
+        #plot residual
+        residual_dict=self.get_residual_hist()
+        res_err = np.sqrt(sig_err**2+bkg_err**2)
+        #plt.figure()
+        ax2 = plt.subplot(3, 1, 3, sharex=ax1)
+        ax2.errorbar(residual_dict.keys(), residual_dict.values(), xerr=0.5, yerr=res_err, fmt='bs', capthick=0,
+                     label="Residual")
+        ax2.axhline(y=0, color='gray', ls='--')
+        ax2.set_xlabel("Burst size")
+        ax2.set_ylabel("Counts")
+        #plt.ylim(0, np.max(sig_burst_hist.values())*1.2)
+        #plt.yscale('log')
+        plt.legend(loc='best')
+        if filename is not None:
+            plt.savefig(filename)
+        else:
+            plt.show()
 
     def plot_theta2(self, theta2s=np.arange(0, 2, 0.01), psf_width=0.1, N=100, const=1, ax=None, ylog=True):
         const_ = np.ones(theta2s.shape[0]) * const
@@ -943,39 +1032,14 @@ def test_burst_finding(window_size=3, runNum=55480, nlines=None, N_scramble=3, p
     dump_pickle(bkg_burst_dicts, save_hist+str(window_size)+"_bkg_dicts.pkl")
 
     if nlines is None:
-        nlines='all'
+        filename=save_hist+"_AllEvts"+"_Nscrambles"+str(N_scramble)+"_window"+str(window_size)+"_method_"+str(bkg_method)+".png"
+    else:
+        filename=save_hist+"_Nevts"+str(nlines)+"_Nscrambles"+str(N_scramble)+"_window"+str(window_size)+"_method_"+str(bkg_method)+".png"
 
-    plt.figure(figsize=(10,8))
-    ax1 = plt.subplot(3,1, (1,2))
-    ax1.errorbar(sig_burst_hist.keys(), sig_burst_hist.values(), xerr=0.5, fmt='bs', capthick=0,
-                 label="Data " + str(nlines) + " events")
-    ax1.errorbar(avg_bkg_hist.keys(), avg_bkg_hist.values(), xerr=0.5, fmt='rv', capthick=0,
-                 label="Background " + str(nlines) + " events")
-    plt.title(str(window_size) + "-s window, "+str(nlines)+ " evts, "+str(N_scramble)+" bootstraps")
-    ax1.set_ylabel("Counts")
-    #plt.ylim(0, np.max(sig_burst_hist.values())*1.2)
-    if plt_log:
-        plt.yscale('log')
-    plt.setp(ax1.get_xticklabels(), visible=False)
-    plt.legend(loc='best')
+    pbh.plot_burst_hist(filename=filename, title="Burst histogram "+str(window_size)+"-s window "+str(bkg_method)+" method",
+                        plt_log=True, error="Poisson")
 
-    #plot residual
-    residual_dict=pbh.get_residual_hist()
-
-    #plt.figure()
-    ax2 = plt.subplot(3, 1, 3, sharex=ax1)
-    ax2.errorbar(residual_dict.keys(), residual_dict.values(), xerr=0.5, fmt='bs', capthick=0,
-                 label="Residual " + str(nlines) + " events")
-    ax2.set_xlabel("Burst size")
-    ax2.set_ylabel("Counts")
-    #plt.ylim(0, np.max(sig_burst_hist.values())*1.2)
-    #plt.yscale('log')
-    plt.legend(loc='best')
-
-    plt.savefig(save_hist+"_Nevts"+str(nlines)+"_Nscrambles"+str(N_scramble)+"_window"+str(window_size)+"_method_"+str(bkg_method)+".png")
-    #plt.savefig(save_hist+"_Nevts"+str(nlines)+"_Nscrambles"+str(N_scramble)+"_window"+str(window_size)+".png")
     print("Done!")
-    #plt.show()
 
     return pbh
 
