@@ -184,7 +184,7 @@ class Pbh(object):
         self.photon_df=self.photon_df.sort('ts')
         return ts_
 
-    def t_rando(self, copy=False):
+    def t_rando(self, copy=False, rate="avg"):
         """
         throw Poisson distr. ts based on the original ts,
         use 1/delta_t as the expected Poisson rate for each event
@@ -195,43 +195,22 @@ class Pbh(object):
             # if you want to keep the original burst_dict, this should only happen at the 1st scramble
             if not hasattr(self, 'photon_df_orig'):
                 self.photon_df_orig = self.photon_df.copy()
-        delta_ts = np.diff(self.photon_df.ts)
-        for i, _delta_t in enumerate(delta_ts):
-            # draw a rando!
-            _rando_delta_t = np.random.exponential(1. / _delta_t)
-            inf_loop_preventer = 0
-            inf_loop_bound = 100
-            while _rando_delta_t < self.VERITAS_deadtime:
-                _rando_delta_t = np.random.exponential(1. / _delta_t)
-                inf_loop_preventer += 1
-                if inf_loop_preventer > inf_loop_bound:
-                    print "Tried 100 times and can't draw a rando wait time that's larger than VERITAS deadtime,"
-                    print "you'd better check your time unit or something..."
-            self.photon_df.at[i + 1, 'ts'] = self.photon_df.ts[i] + _rando_delta_t
-        #naturally sorted
-        # re-init _burst_dict for counting
-        self._burst_dict = {}
-        return self.photon_df.ts
+        if rate=="cell":
+            delta_ts = np.diff(self.photon_df.ts)
+        #for i, _delta_t in enumerate(delta_ts):
+        N = self.photon_df.shape[0]
+        rate_expected= N*1.0/(self.photon_df.values[-1]-self.photon_df.values[0])
+        for i in range(-1):
+            if rate=="cell":
+                rate_expected = 1. / delta_ts[i]
+            #elif rate=="avg":
 
-    def t_rando(self, copy=False):
-        """
-        throw Poisson distr. ts based on the original ts,
-        use 1/delta_t as the expected Poisson rate for each event
-        """
-        if not hasattr(self, 'photon_df'):
-            print "Call get_TreeWithAllGamma first..."
-        if copy:
-            # if you want to keep the original burst_dict, this should only happen at the 1st scramble
-            if not hasattr(self, 'photon_df_orig'):
-                self.photon_df_orig = self.photon_df.copy()
-        delta_ts = np.diff(self.photon_df.ts)
-        for i, _delta_t in enumerate(delta_ts):
             # draw a rando!
-            _rando_delta_t = np.random.exponential(1. / _delta_t)
+            _rando_delta_t = np.random.exponential(rate_expected)
             inf_loop_preventer = 0
             inf_loop_bound = 100
             while _rando_delta_t < self.VERITAS_deadtime:
-                _rando_delta_t = np.random.exponential(1. / _delta_t)
+                _rando_delta_t = np.random.exponential(rate_expected)
                 inf_loop_preventer += 1
                 if inf_loop_preventer > inf_loop_bound:
                     print "Tried 100 times and can't draw a rando wait time that's larger than VERITAS deadtime,"
@@ -762,6 +741,16 @@ class Pbh(object):
 
         plt.figure(figsize=(10,8))
         ax1 = plt.subplot(3,1, (1,2))
+
+        if self.avg_bkg_hist.keys() != self.sig_burst_hist.keys():
+            for key in self.avg_bkg_hist.keys():
+                if key not in self.sig_burst_hist:
+                    self.sig_burst_hist[key]=0
+            for key in self.sig_burst_hist.keys():
+                if key not in self.avg_bkg_hist:
+                    self.avg_bkg_hist[key]=0
+
+
         if error is None:
             sig_err = np.zeros(np.array(self.sig_burst_hist.values()).shape[0])
             bkg_err = np.zeros(np.array(self.avg_bkg_hist.values()).hape[0])
@@ -792,7 +781,11 @@ class Pbh(object):
 
         #plot residual
         residual_dict=self.get_residual_hist()
+
+        if self.avg_bkg_hist.keys() != self.sig_burst_hist.keys():
+            print("Check residual error calc")
         res_err = np.sqrt(sig_err**2+bkg_err**2)
+
         #plt.figure()
         ax2 = plt.subplot(3, 1, 3, sharex=ax1)
         ax2.errorbar(residual_dict.keys(), residual_dict.values(), xerr=0.5, yerr=res_err, fmt='bs', capthick=0,
@@ -1115,8 +1108,8 @@ def test2():
 
 if __name__ == "__main__":
     #test_singlet_remover()
-    pbh = test_burst_finding(window_size=10, runNum=55480, nlines=None, N_scramble=10,
-                             save_hist="test_burst_finding_histo", bkg_method="scramble")
+    pbh = test_burst_finding(window_size=5, runNum=55480, nlines=None, N_scramble=5,
+                             save_hist="test_burst_finding_histo", bkg_method="rando")
     #pbh = test_psf_func(Nburst=10, filename=None)
 
     #pbh = test_psf_func_sim(psf_width=0.05, Nsim=10000, prob="psf", Nbins=40, xlim=(0,0.5),
