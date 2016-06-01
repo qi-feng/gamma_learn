@@ -207,7 +207,7 @@ class Pbh(object):
                 if inf_loop_preventer > inf_loop_bound:
                     print "Tried 100 times and can't draw a rando wait time that's larger than VERITAS deadtime,"
                     print "you'd better check your time unit or something..."
-            self.photon_df.ts.at[i + 1] = self.photon_df.ts[i] + _rando_delta_t
+            self.photon_df.at[i + 1, 'ts'] = self.photon_df.ts[i] + _rando_delta_t
         #naturally sorted
         # re-init _burst_dict for counting
         self._burst_dict = {}
@@ -236,7 +236,7 @@ class Pbh(object):
                 if inf_loop_preventer > inf_loop_bound:
                     print "Tried 100 times and can't draw a rando wait time that's larger than VERITAS deadtime,"
                     print "you'd better check your time unit or something..."
-            self.photon_df.ts.at[i + 1] = self.photon_df.ts[i] + _rando_delta_t
+            self.photon_df.at[i + 1, 'ts'] = self.photon_df.ts[i] + _rando_delta_t
         #naturally sorted
         # re-init _burst_dict for counting
         self._burst_dict = {}
@@ -664,7 +664,7 @@ class Pbh(object):
         largest_burst_number = max(self._burst_dict, key=lambda x: len(set(self._burst_dict[x])))
         for evt in self._burst_dict[largest_burst_number]:
             # Assign burst size to all events in the largest burst
-            self.photon_df.burst_sizes[evt] = self._burst_dict[largest_burst_number].shape[0]
+            self.photon_df.at[evt, 'burst_sizes'] = self._burst_dict[largest_burst_number].shape[0]
             #self.photon_df.burst_sizes[evt] = len(self._burst_dict[largest_burst_number])
             for key in self._burst_dict.keys():
                 # Now delete the assigned events in all other candiate bursts to avoid double counting
@@ -1114,8 +1114,8 @@ def test2():
 
 if __name__ == "__main__":
     #test_singlet_remover()
-    pbh = test_burst_finding(window_size=1, runNum=55480, nlines=None, N_scramble=5,
-                             save_hist="test_burst_finding_histo", save_res="test_burst_finding_residual")
+    pbh = test_burst_finding(window_size=1, runNum=55480, nlines=None, N_scramble=10,
+                             save_hist="test_burst_finding_histo", bkg_method="scramble")
     #pbh = test_psf_func(Nburst=10, filename=None)
 
     #pbh = test_psf_func_sim(psf_width=0.05, Nsim=10000, prob="psf", Nbins=40, xlim=(0,0.5),
