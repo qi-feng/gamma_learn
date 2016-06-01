@@ -523,6 +523,9 @@ class Pbh(object):
             print("Counting bursts")
         #_burst_dict = self._burst_dict.copy()
         self.duplicate_burst_dict()
+        # initialize burst sizes
+        self.photon_df.at[:, 'burst_sizes'] = 1
+
         #Note now self._burst_dict will be cleared!!
         self.burst_counting()
         burst_hist = self.get_burst_hist()
@@ -658,8 +661,6 @@ class Pbh(object):
         :return: nothing but fills self.photon_df.burst_sizes, during the process self._burst_dict is emptied!
         """
         # Only to be called after self._burst_dict is filled
-        # initialize burst sizes
-        self.photon_df.at[:, 'burst_sizes'] = 1
         # Find the largest burst
         largest_burst_number = max(self._burst_dict, key=lambda x: len(set(self._burst_dict[x])))
         for evt in self._burst_dict[largest_burst_number]:
@@ -1114,7 +1115,7 @@ def test2():
 
 if __name__ == "__main__":
     #test_singlet_remover()
-    pbh = test_burst_finding(window_size=1, runNum=55480, nlines=None, N_scramble=10,
+    pbh = test_burst_finding(window_size=10, runNum=55480, nlines=None, N_scramble=10,
                              save_hist="test_burst_finding_histo", bkg_method="scramble")
     #pbh = test_psf_func(Nburst=10, filename=None)
 
