@@ -201,7 +201,7 @@ class Pbh(object):
         N = self.photon_df.shape[0]
         rate_expected= N*1.0/(self.photon_df.ts.values[-1]-self.photon_df.ts.values[0])
         print("Mean expected rate is %.2f" % rate_expected)
-        for i in range(N):
+        for i in range(N-1):
             if rate=="cell":
                 rate_expected = 1. / delta_ts[i]
             #elif rate=="avg":
@@ -671,7 +671,8 @@ class Pbh(object):
         self.sig_burst_dict = _sig_burst_dict.copy()
         return self.sig_burst_hist, self.sig_burst_dict
 
-    def estimate_bkg_burst(self, window_size=1, method="scramble", copy=True, n_scramble=1, return_burst_dict=False, verbose=False):
+    def estimate_bkg_burst(self, window_size=1, method="scramble", copy=True, n_scramble=1, rando_method="avg",
+                           return_burst_dict=False, verbose=False):
         """
         :param method: either "scramble" or "rando"
         :return:
@@ -685,7 +686,7 @@ class Pbh(object):
             if method == "scramble":
                 self.scramble(copy=copy)
             elif method == "rando":
-                self.t_rando(copy=copy)
+                self.t_rando(copy=copy, rate=rando_method)
             bkg_burst_hist, bkg_burst_dict = self.search_time_window(window_size=window_size, verbose=verbose)
             bkg_burst_hists.append(bkg_burst_hist.copy())
             if return_burst_dict:
