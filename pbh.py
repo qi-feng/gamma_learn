@@ -199,8 +199,9 @@ class Pbh(object):
             delta_ts = np.diff(self.photon_df.ts)
         #for i, _delta_t in enumerate(delta_ts):
         N = self.photon_df.shape[0]
-        rate_expected= N*1.0/(self.photon_df.values[-1]-self.photon_df.values[0])
-        for i in range(-1):
+        rate_expected= N*1.0/(self.photon_df.ts.values[-1]-self.photon_df.ts.values[0])
+        print("Mean expected rate is %.2f" % rate_expected)
+        for i in range(N):
             if rate=="cell":
                 rate_expected = 1. / delta_ts[i]
             #elif rate=="avg":
