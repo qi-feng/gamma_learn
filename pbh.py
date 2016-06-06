@@ -14,6 +14,7 @@ sys.setrecursionlimit(50000)
 
 try:
     import ROOT
+    ROOT.PyConfig.StartGuiThread = False
 except:
     print "Can't import ROOT, no related functionality possible"
 
@@ -1022,7 +1023,7 @@ def test_burst_finding(window_size=3, runNum=55480, nlines=None, N_scramble=3, p
     sig_burst_hist, sig_burst_dict = pbh.sig_burst_search(window_size=window_size, verbose=verbose)
 
     #avg_bkg_hist = pbh.estimate_bkg_burst(window_size=window_size, method="scramble", copy=True, n_scramble=N_scramble)
-    avg_bkg_hist, bkg_burst_dicts = pbh.estimate_bkg_burst(window_size=window_size, method=bkg_method, rando_method=rando_method, 
+    avg_bkg_hist, bkg_burst_dicts = pbh.estimate_bkg_burst(window_size=window_size, method=bkg_method, rando_method=rando_method,
                                                            copy=True, n_scramble=N_scramble, return_burst_dict=True, verbose=verbose)
 
     dump_pickle(sig_burst_hist, save_hist+str(window_size)+"_sig_hist.pkl")
