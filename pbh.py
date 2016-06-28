@@ -7,6 +7,8 @@ from scipy.optimize import curve_fit, minimize
 from scipy import stats
 import random
 import cPickle as pickle
+from scipy.special import gamma
+from math import factorial
 
 import sys
 
@@ -31,7 +33,6 @@ def deg2rad(deg):
 
 def rad2deg(rad):
     return rad * 180. / np.pi
-
 
 class Pbh(object):
     def __init__(self):
@@ -109,14 +110,15 @@ class Pbh(object):
                 raise
         all_gamma_treeName = "run_" + str(self.runNum) + "/stereo/TreeWithAllGamma"
         # pointingData_treeName = "run_"+str(self.runNum)+"/stereo/pointingDataReduced"
-        all_gamma_tree = self.Rfile.Get(all_gamma_treeName);
-        #pointingData = self.Rfile.Get(pointingData_treeName);
+        all_gamma_tree = self.Rfile.Get(all_gamma_treeName)
+        #pointingData = self.Rfile.Get(pointingData_treeName)
         #ptTime=[]
         #for ptd in pointingData:
         #    ptTime.append(ptd.Time);
         #ptTime=np.array(ptTime)
         #columns=['runNumber','eventNumber', 'MJD', 'Time', 'Elevation', ]
         columns = ['MJDs', 'ts', 'RAs', 'Decs', 'Es', 'ELs', 'psfs', 'burst_sizes', 'fail_cut']
+        # EA is a function of energy, zenith, wobble offset, optical efficiency, and reconstructed camera coords
         if nlines is not None:
             N_ = nlines
         else:
@@ -166,6 +168,30 @@ class Pbh(object):
         ###QF
         #print self.photon_df.head()
 
+    def getRunSummary(self):
+        tRunSumName = "total_1/stereo/tRunSummary"
+        tRunSummary = self.Rfile.Get(tRunSumName)
+        for tR in tRunSummary:
+            self.tOn = tR.tOn
+            self.Rate = tR.Rate
+            self.RateOff = tR.RateOff
+            self.DeadTimeFracOn = tR.DeadTimeFracOn
+            self.TargetRA = tR.TargetRA
+            self.TargetDec = tR.TargetDec
+            self.TargetRAJ2000 = tR.TargetRAJ2000
+            self.TargetDecJ2000 = tR.TargetDecJ2000
+            break
+        self.total_time_year = (self.tOn*(1.-self.DeadTimeFracOn))/31536000.
+        ea_Name = "run_" + str(self.runNum) + "/stereo/EffectiveAreas/gMeanEffectiveArea"
+        ea = self.Rfile.Get(ea_Name);
+        self.EA = np.zeros((ea.GetN(), 2))
+        for i in range(ea.GetN()):
+            self.EA[i,0] = ea.GetX()[i]
+            self.EA[i,1] = ea.GetY()[i]
+
+        accept_Name = "run_" + str(self.runNum) + "/stereo/RadialAcceptances/fAccZe_0"
+        self.accept = self.Rfile.Get(accept_Name);
+        #use self.accept.Eval(x) to get y, or just self.accept(x)
 
     def scramble(self, copy=False):
         if not hasattr(self, 'photon_df'):
@@ -734,6 +760,147 @@ class Pbh(object):
         self.residual_dict = residual_dict
         return residual_dict
 
+    def kT_BH(self, t_window):
+        #eq 8.2
+        #temperature (energy in the unit of GeV) of the BH
+        return 7.8e3*(t_window)**(-1./3)
+
+    def diff_raw_number(self, E, kT_BH):
+        #eq 8.1
+        #The expected dN/dE of gammas at energy E (unit GeV), temp kT_BH(tau)
+        if E<kT_BH:
+            n_exp_gamma = 9.e35 * kT_BH**(-1.5) * E**(-1.5)
+        else:
+            n_exp_gamma = 9.e35 * E**(-3)
+        return n_exp_gamma
+
+    def get_integral_expected(self, kT_BH, verbose=False):
+        #eq 8.3 with no acceptance (I in eq 8.7); EA normalized to the unit of pc^2
+        #The expected # of gammas
+        if not hasattr(self,'EA'):
+            print("self.EA doesn't exist, reading it now")
+            self.getRunSummary()
+        #2D array, energy and (dN/dE * EA)
+        number_expected = np.zeros((self.EA.shape[0], 2))
+        count = 0
+        for e_, ea_ in self.EA:
+            #print e_, ea_
+            diff_n_exp = self.diff_raw_number(10**e_*1000., kT_BH)
+            number_expected[count, 0] = 10**e_*1000.
+            number_expected[count, 1] = diff_n_exp * ea_ / (3.086e+16**2)
+            count += 1
+            # 1 pc = 3.086e+16 m
+        energy_cut_indices = np.where((number_expected[:, 0]>=80.) & (number_expected[:, 0]<=50000.))
+        integral_expected = np.trapz(number_expected[energy_cut_indices, 1], x=number_expected[energy_cut_indices, 0])
+        #This is the "I**(3./2)" in eq 8.7 in Simon's thesis
+        integral_expected = integral_expected**(3./2.)
+        if verbose:
+            print("The value of I in eq 8.7 is %.2f" % integral_expected)
+        return integral_expected
+
+    def get_accept_integral(self, integral_limit = 1.5, verbose=False):
+        # \int (g(alpha, beta))**(3./2) d(cos(theta)) in eq 8.7
+        rad_=np.arange(0,integral_limit,0.001)
+        acc_=[]
+        for d_ in rad_:
+            acc_.append(self.accept(d_))
+        accept_int = np.trapz(np.array(acc_)**(3./2) * np.sin(rad_*np.pi/180.), x = rad_)
+        if verbose:
+            print("The value of the acceptance integral in eq 8.7 is %.2f" % accept_int)
+        return accept_int
+
+    def V_eff(self, burst_size, t_window, verbose=False):
+        #eq 8.7; time is in the unit of year
+        I_Value = self.get_integral_expected(self.kT_BH(t_window))
+        rad_Int = self.get_accept_integral()
+        effVolume = (1./(8*np.sqrt(np.pi))) * gamma(burst_size - 1.5) / factorial(burst_size) * I_Value * rad_Int #* self.total_time_year
+        if verbose:
+            print("The value of the effective volume (eq 8.7) is %.2f" % effVolume)
+        return effVolume
+
+    def n_excess(self, rho_dot, Veff, verbose=False):
+        #eq 8.8, or maybe more appropriately call it n_expected
+        if not hasattr(self, 'total_time_year'):
+            self.total_time_year = (self.tOn*(1.-self.DeadTimeFracOn))/31536000.
+        n_ex = 1.0 * rho_dot * self.total_time_year * Veff
+        if verbose:
+            print("The value of the expected number of bursts (eq 8.9) is %.2f" % n_ex)
+        return n_ex
+
+    def ll(self, n_on, n_off, n_expected, verbose=False):
+        #eq 8.13 without the sum
+        ll_ = -2. * (-1. * n_expected + n_on * np.log(n_off + n_expected))
+        if verbose:
+            print("The likelihood value term for the given burst size (eq 8.13 before sum) is %.2f" % ll_)
+        return ll_
+
+    def get_significance(self, verbose=False):
+        residual_dict = self.residual_dict
+        significance = 0
+        for b_, excess_ in residual_dict.iteritems():
+            err_excess_ = np.sqrt( self.sig_burst_hist[b_] + pow(np.sqrt(10*self.bkg_burst_hists[b_])/10,2) )
+            if verbose:
+                print("Significance for bin %d has significance %.2f" % (b_, excess_/err_excess_) )
+            significance += excess_/err_excess_
+        if verbose:
+            print("Overall Significance is %d" % significance)
+        return significance
+
+    def get_ll(self, rho_dot, burst_size_threshold, t_window, verbose=False):
+        #eq 8.13, get -2lnL sum above the given burst_size_threshold, for the given search window and rho_dot
+        all_burst_sizes = set(k for dic in [self.sig_burst_hist, self.avg_bkg_hist] for k in dic.keys())
+        ll_ = 0.0
+        for burst_size in all_burst_sizes:
+            if burst_size >= burst_size_threshold:
+                Veff_ = self.V_eff(burst_size, t_window, verbose=verbose)
+                n_expected_ = self.n_excess(rho_dot, Veff_, verbose=verbose)
+                if burst_size not in self.sig_burst_hist:
+                    self.sig_burst_hist[burst_size] = 0
+                if burst_size not in self.avg_bkg_hist:
+                    self.avg_bkg_hist[burst_size] = 0
+                n_on_ = self.sig_burst_hist[burst_size]
+                n_off_ = self.avg_bkg_hist[burst_size]
+                ll_ += self.ll(n_on_, n_off_, n_expected_)
+        if verbose:
+            print("-2lnL above burst size %d, for search window %.1f and rate density %.1f is %.2f" % (burst_size_threshold, t_window, rho_dot, ll_))
+        return ll_
+
+    def get_ll_vs_rho_dot(self, burst_size, t_window, rho_dots=np.arange(1e5, 2.e6, 100), verbose=False):
+        #plot a vertical slice of Fig 8-4, for a given burst size and search window, scan through rho_dot and plot -2lnL
+        if not isinstance(rho_dots, np.ndarray):
+            rho_dots = np.asarray(rho_dots)
+        lls_ = np.zeros(rho_dots.shape[0])
+        for i, rho_dot_ in enumerate(rho_dots):
+            lls_[i] = self.get_ll(rho_dot_, burst_size, t_window, verbose=verbose)
+        return rho_dots, lls_
+
+    def get_minimum_ll(self, burst_size, t_window, verbose=False):
+        init_rho_dot = 2.e5
+        results = minimize(self.get_ll, init_rho_dot, args=(burst_size, t_window), method='L-BFGS-B',bounds=[(0,1.e7)])
+        if not results.success:
+            print("Problem finding the minimum log likelihood!! ")
+        minimum_rho_dot = results.x
+        minimum_ll = results.fun
+        if verbose:
+            print("The minimum -2lnL is %.2f at rho_dot %.1f" % (minimum_ll, minimum_rho_dot) )
+        return minimum_rho_dot, minimum_ll
+
+    def get_likelihood_dict(self):
+        ll_dict={}
+        residual_dict = self.residual_dict
+
+        sig_bkg_burst_sizes = set(k for dic in [self.sig_burst_hist, self.avg_bkg_hist] for k in dic.keys())
+        #fill with zero if no burst size count
+        for key_ in sig_bkg_burst_sizes:
+            key_ = int(key_)
+            if key_ not in self.sig_burst_hist:
+                self.sig_burst_hist[key_] = 0
+            if key_ not in self.avg_bkg_hist:
+                self.avg_bkg_hist[key_] = 0
+            residual_dict[key_] = self.sig_burst_hist[key_] - self.avg_bkg_hist[key_]
+        return residual_dict
+
+
     def plot_burst_hist(self, filename=None, title="Burst histogram", plt_log=True, error="Poisson"):
         if not hasattr(self,'sig_burst_hist'):
             print("self.sig_burst_hist doesn't exist, what to plot?")
@@ -752,7 +919,6 @@ class Pbh(object):
             for key in self.sig_burst_hist.keys():
                 if key not in self.avg_bkg_hist:
                     self.avg_bkg_hist[key]=0
-
 
         if error is None:
             sig_err = np.zeros(np.array(self.sig_burst_hist.values()).shape[0])
@@ -1042,6 +1208,36 @@ def test_burst_finding(window_size=3, runNum=55480, nlines=None, N_scramble=3, p
 
     return pbh
 
+
+def test_ll(window_size=3, runNum=55480, N_scramble=3, verbose=False, rho_dots=np.arange(1e4, 2.e6, 1000),
+                       save_hist="test_ll", bkg_method="scramble", rando_method="avg",
+                       burst_size=2):
+    pbh = Pbh()
+    pbh.get_TreeWithAllGamma(runNum=runNum, nlines=None)
+    sig_burst_hist, sig_burst_dict = pbh.sig_burst_search(window_size=window_size, verbose=verbose)
+
+    avg_bkg_hist, bkg_burst_dicts = pbh.estimate_bkg_burst(window_size=window_size, method=bkg_method, rando_method=rando_method,
+                                                           copy=True, n_scramble=N_scramble, return_burst_dict=True, verbose=verbose)
+
+
+    filename=save_hist+"_AllEvts"+"_Nscrambles"+str(N_scramble)+"_window"+str(window_size)+"_method_"+str(bkg_method)+".png"
+
+
+    rho_dots, lls = pbh.get_ll_vs_rho_dot(burst_size, window_size, rho_dots=rho_dots, verbose=verbose)
+    minimum_rho_dot, minimum_ll = pbh.get_minimum_ll(burst_size, window_size, verbose=verbose)
+    plt.plot(rho_dots, lls, "b",label="burst size "+str(burst_size)+", "+str(window_size)+"-s window")
+    plt.axvline(x=minimum_rho_dot, color="b", ls="--",
+                label=("minimum -2lnL = %.2f at rho_dot = %.1f " % (minimum_ll, minimum_rho_dot)))
+    plt.xlabel(r"Rate density of PBH evaporation (pc$^{-3}$ yr$^{-1}$)")
+    plt.ylabel(r"-2lnL")
+    plt.legend(loc='best')
+    plt.savefig(filename, dpi=150)
+    plt.show()
+    print("Done!")
+
+    return pbh
+
+
 def load_pickle(f):
     inputfile = open(f, 'rb')
     loaded = pickle.load(inputfile)
@@ -1101,6 +1297,20 @@ def test_singlet_remover(Nburst=10, filename=None, cent_ms=8.0, cent_mew=1.8):
     slice, singlet_slice = pbh.singlet_remover(slice)
     print(slice)
 
+def plot_Veff(pbh, window_sizes=[1, 10, 100], burst_sizes=range(2,11), lss=['-', '--', ':'], cs=['r', 'b', 'k'], filename="Effective_volume.png"):
+    for i, window_ in enumerate(window_sizes):
+        Veffs=[]
+        for b in burst_sizes:
+            Veffs.append(pbh.V_eff(b, window_))
+        plt.plot(burst_sizes, Veffs, color=cs[i], ls=lss[i], label=("search window %d s" % window_))
+    plt.yscale('log')
+    plt.xlabel("burst size")
+    plt.ylabel(r"effective volume (pc$^3$)")
+    plt.legend(loc='best')
+    if filename is not None:
+        plt.savefig(filename, dpi=150)
+    plt.show()
+
 
 def test2():
     pbh = Pbh()
@@ -1111,8 +1321,11 @@ def test2():
 
 if __name__ == "__main__":
     #test_singlet_remover()
-    pbh = test_burst_finding(window_size=5, runNum=55480, nlines=None, N_scramble=5,
-                             save_hist="test_burst_finding_histo", bkg_method="rando")
+    #pbh = test_burst_finding(window_size=5, runNum=55480, nlines=None, N_scramble=5,
+    #                         save_hist="test_burst_finding_histo", bkg_method="rando")
+    pbh = test_ll(window_size=3, runNum=55480, N_scramble=3, verbose=False, rho_dots=np.arange(1e3, 5.e5, 1000.),
+                  save_hist="test_ll", bkg_method="scramble", rando_method="avg",
+                  burst_size=2)
     #pbh = test_psf_func(Nburst=10, filename=None)
 
     #pbh = test_psf_func_sim(psf_width=0.05, Nsim=10000, prob="psf", Nbins=40, xlim=(0,0.5),
