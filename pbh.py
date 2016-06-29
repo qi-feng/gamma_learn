@@ -861,8 +861,14 @@ class Pbh(object):
                 n_on_ = self.sig_burst_hist[burst_size]
                 n_off_ = self.avg_bkg_hist[burst_size]
                 ll_ += self.ll(n_on_, n_off_, n_expected_)
+                if verbose:
+                    print("######################################################################################")
+                    print("Adding -2lnL at burst size %d, for search window %.1f and rate density %.1f, so far -2lnL = %.2f" % (burst_size, t_window, rho_dot, ll_))
+                    print("######################################################################################")
         if verbose:
+            print("######################################################################################")
             print("-2lnL above burst size %d, for search window %.1f and rate density %.1f is %.2f" % (burst_size_threshold, t_window, rho_dot, ll_))
+            print("######################################################################################")
         return ll_
 
     def get_ll_vs_rho_dot(self, burst_size, t_window, rho_dots=np.arange(1e5, 2.e6, 100), verbose=False):
