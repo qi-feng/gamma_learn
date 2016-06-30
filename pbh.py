@@ -1271,7 +1271,8 @@ def test_ll(window_size=3, runNum=55480, N_scramble=3, verbose=False, rho_dots=n
 
 
     rho_dots, lls = pbh.get_ll_vs_rho_dot(burst_size, window_size, rho_dots=rho_dots, verbose=verbose)
-    minimum_rho_dot, minimum_ll = pbh.get_minimum_ll(burst_size, window_size, verbose=verbose)
+    #minimum_rho_dot, minimum_ll = pbh.get_minimum_ll(burst_size, window_size, verbose=verbose, return_arrays=False)
+    minimum_rho_dot, minimum_ll, rho_dots, lls = pbh.get_minimum_ll(burst_size, window_size, verbose=verbose)
     plt.plot(rho_dots, lls, "b",label="burst size "+str(burst_size)+", "+str(window_size)+"-s window")
     plt.axvline(x=minimum_rho_dot, color="b", ls="--",
                 label=("minimum -2lnL = %.2f at rho_dot = %.1f " % (minimum_ll, minimum_rho_dot)))
