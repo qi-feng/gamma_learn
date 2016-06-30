@@ -9,6 +9,7 @@ import random
 import cPickle as pickle
 from scipy.special import gamma
 from math import factorial
+import tables
 
 import sys
 
@@ -880,6 +881,43 @@ class Pbh(object):
             lls_[i] = self.get_ll(rho_dot_, burst_size, t_window, verbose=verbose)
         return rho_dots, lls_
 
+    def get_minimum_ll(self, burst_size, t_window, rho_dots=np.arange(0., 3.e5, 100), return_arrays=True,
+                       verbose=False):
+        #search rho_dots for the minimum -2lnL
+        if not isinstance(rho_dots, np.ndarray):
+            rho_dots = np.asarray(rho_dots)
+        min_ll_ = 1.e5
+        rho_dot_min_ll_ = -1.0
+        if return_arrays:
+            lls_ = np.zeros(rho_dots.shape[0])
+        for rho_dot_ in rho_dots:
+            ll_ = self.get_ll(rho_dot_, burst_size, t_window, verbose=verbose)
+            if ll_ < min_ll_:
+                min_ll_ = ll_
+                rho_dot_min_ll_ = rho_dot_
+            if return_arrays:
+                lls_[i] = ll_
+        if return_arrays:
+            return rho_dot_min_ll_, min_ll_, rho_dots, lls_
+        return rho_dot_min_ll_, min_ll_
+
+    def get_ul_rho_dot(self, rho_dots, lls_, min_ll_):
+        ll_99 = 6.63
+        ul_99_idx = (np.abs(lls_-min_ll_-ll_99)).argmin()
+        ul_99_idx_all = np.where(abs(lls_-lls_[ul_99_idx])<1e-5)
+        if ul_99_idx_all[0].shape[0]==0:
+            print("Can't find 99% UL!")
+            raise
+        elif ul_99_idx_all[0].shape[0]>1:
+            print("More than one 99% UL found, strange!")
+            print("These are rho_dot = %s, and -2lnL = %s" % (rho_dots[ul_99_idx_all], lls_[ul_99_idx_all]))
+            return rho_dots[ul_99_idx_all], lls_[ul_99_idx_all]
+        else:
+            print("99%% UL found at rho_dot = %.0f, and -2lnL = %.2f" % (rho_dots[ul_99_idx], lls_[ul_99_idx]))
+            return rho_dots[ul_99_idx], lls_[ul_99_idx]
+
+    """
+    # won't work:
     def get_minimum_ll(self, burst_size, t_window, verbose=False):
         init_rho_dot = 2.e5
         results = minimize(self.get_ll, init_rho_dot, args=(burst_size, t_window), method='L-BFGS-B',bounds=[(0,1.e7)])
@@ -890,6 +928,7 @@ class Pbh(object):
         if verbose:
             print("The minimum -2lnL is %.2f at rho_dot %.1f" % (minimum_ll, minimum_rho_dot) )
         return minimum_rho_dot, minimum_ll
+    """
 
     def get_likelihood_dict(self):
         ll_dict={}
@@ -1244,6 +1283,24 @@ def test_ll(window_size=3, runNum=55480, N_scramble=3, verbose=False, rho_dots=n
     return pbh
 
 
+def load_hdf5(fname):
+    with tables.open_file(fname) as h5f:
+        data = h5f.root.image[:]
+    return data
+
+
+def save_hdf5(data,ofname,compress=False, complevel=5, complib='zlib'):
+    with tables.open_file(ofname,'w') as h5f:
+        atom = tables.Atom.from_dtype(data.dtype)
+        shape = data.shape
+        if compress:
+            filters = tables.Filters(complevel=complevel, complib=complib)
+            ca = h5f.create_carray(h5f.root, 'image', atom, shape,filters=filters)
+        else:
+            ca = h5f.create_carray(h5f.root, 'image', atom, shape)
+        ca[:] = data[:]
+
+
 def load_pickle(f):
     inputfile = open(f, 'rb')
     loaded = pickle.load(inputfile)
@@ -1303,12 +1360,15 @@ def test_singlet_remover(Nburst=10, filename=None, cent_ms=8.0, cent_mew=1.8):
     slice, singlet_slice = pbh.singlet_remover(slice)
     print(slice)
 
-def plot_Veff(pbh, window_sizes=[1, 10, 100], burst_sizes=range(2,11), lss=['-', '--', ':'], cs=['r', 'b', 'k'], filename="Effective_volume.png"):
+def plot_Veff(pbh, window_sizes=[1, 10, 100], burst_sizes=range(2,11), lss=['-', '--', ':'], cs=['r', 'b', 'k'],
+              draw_grid=True, filename="Effective_volume.png"):
     for i, window_ in enumerate(window_sizes):
         Veffs=[]
         for b in burst_sizes:
             Veffs.append(pbh.V_eff(b, window_))
         plt.plot(burst_sizes, Veffs, color=cs[i], ls=lss[i], label=("search window %d s" % window_))
+    if draw_grid:
+        plt.grid(b=True)
     plt.yscale('log')
     plt.xlabel("burst size")
     plt.ylabel(r"effective volume (pc$^3$)")
