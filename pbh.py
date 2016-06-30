@@ -863,13 +863,13 @@ class Pbh(object):
                 n_off_ = self.avg_bkg_hist[burst_size]
                 ll_ += self.ll(n_on_, n_off_, n_expected_)
                 if verbose:
-                    print("######################################################################################")
+                    #print("###############################################################################")
                     print("Adding -2lnL at burst size %d, for search window %.1f and rate density %.1f, so far -2lnL = %.2f" % (burst_size, t_window, rho_dot, ll_))
-                    print("######################################################################################")
+                    #print("###############################################################################")
         if verbose:
-            print("######################################################################################")
+            print("###############################################################################")
             print("-2lnL above burst size %d, for search window %.1f and rate density %.1f is %.2f" % (burst_size_threshold, t_window, rho_dot, ll_))
-            print("######################################################################################")
+            print("###############################################################################")
         return ll_
 
     def get_ll_vs_rho_dot(self, burst_size, t_window, rho_dots=np.arange(1e5, 2.e6, 100), verbose=False):
@@ -1256,29 +1256,31 @@ def test_burst_finding(window_size=3, runNum=55480, nlines=None, N_scramble=3, p
     return pbh
 
 
-def test_ll(window_size=3, runNum=55480, N_scramble=3, verbose=False, rho_dots=np.arange(1e4, 2.e6, 1000),
-                       save_hist="test_ll", bkg_method="scramble", rando_method="avg",
-                       burst_size=2):
+def test_ll(window_sizes=[1,2,5,10], colors=['k', 'r', 'b', 'magenta'], runNum=55480, N_scramble=3, verbose=False,
+            rho_dots=np.arange(0., 5.e5, 100), save_hist="test_ll", bkg_method="scramble", rando_method="avg",
+            burst_size=2, xlog=True, grid=True):
     pbh = Pbh()
     pbh.get_TreeWithAllGamma(runNum=runNum, nlines=None)
-    sig_burst_hist, sig_burst_dict = pbh.sig_burst_search(window_size=window_size, verbose=verbose)
 
-    avg_bkg_hist, bkg_burst_dicts = pbh.estimate_bkg_burst(window_size=window_size, method=bkg_method, rando_method=rando_method,
-                                                           copy=True, n_scramble=N_scramble, return_burst_dict=True, verbose=verbose)
-
-
-    filename=save_hist+"_AllEvts"+"_Nscrambles"+str(N_scramble)+"_window"+str(window_size)+"_method_"+str(bkg_method)+".png"
-
-
-    rho_dots, lls = pbh.get_ll_vs_rho_dot(burst_size, window_size, rho_dots=rho_dots, verbose=verbose)
-    #minimum_rho_dot, minimum_ll = pbh.get_minimum_ll(burst_size, window_size, verbose=verbose, return_arrays=False)
-    minimum_rho_dot, minimum_ll, rho_dots, lls = pbh.get_minimum_ll(burst_size, window_size, verbose=verbose)
-    plt.plot(rho_dots, lls, "b",label="burst size "+str(burst_size)+", "+str(window_size)+"-s window")
-    plt.axvline(x=minimum_rho_dot, color="b", ls="--",
-                label=("minimum -2lnL = %.2f at rho_dot = %.1f " % (minimum_ll, minimum_rho_dot)))
+    for ii, window_size in enumerate(window_sizes):
+        sig_burst_hist, sig_burst_dict = pbh.sig_burst_search(window_size=window_size, verbose=verbose)
+        avg_bkg_hist, bkg_burst_dicts = pbh.estimate_bkg_burst(window_size=window_size, method=bkg_method, rando_method=rando_method,
+                                                               copy=True, n_scramble=N_scramble, return_burst_dict=True, verbose=verbose)
+        #rho_dots, lls = pbh.get_ll_vs_rho_dot(burst_size, window_size, rho_dots=rho_dots, verbose=verbose)
+        #minimum_rho_dot, minimum_ll = pbh.get_minimum_ll(burst_size, window_size, verbose=verbose, return_arrays=False)
+        minimum_rho_dot, minimum_ll, rho_dots, lls = pbh.get_minimum_ll(burst_size, window_size, rho_dots=rho_dots, verbose=verbose)
+        plt.plot(rho_dots, lls-minimum_ll, color=colors[ii],label="burst size "+str(burst_size)+", "+str(window_size)+"-s window")
+    #plt.axvline(x=minimum_rho_dot, color="b", ls="--",
+    #            label=("minimum -2lnL = %.2f at rho_dot = %.1f " % (minimum_ll, minimum_rho_dot)))
+    plt.axhline(y=6.63, color="r", ls='--')
     plt.xlabel(r"Rate density of PBH evaporation (pc$^{-3}$ yr$^{-1}$)")
-    plt.ylabel(r"-2lnL")
+    plt.ylabel(r"-2$\Delta$lnL")
     plt.legend(loc='best')
+    if xlog:
+        plt.xscale('log')
+    if grid:
+        plt.grid(b=True)
+    filename=save_hist+"_AllEvts.png"
     plt.savefig(filename, dpi=150)
     plt.show()
     print("Done!")
