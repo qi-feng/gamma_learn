@@ -890,6 +890,7 @@ class Pbh(object):
         rho_dot_min_ll_ = -1.0
         if return_arrays:
             lls_ = np.zeros(rho_dots.shape[0])
+        i=0
         for rho_dot_ in rho_dots:
             ll_ = self.get_ll(rho_dot_, burst_size, t_window, verbose=verbose)
             if ll_ < min_ll_:
@@ -897,6 +898,7 @@ class Pbh(object):
                 rho_dot_min_ll_ = rho_dot_
             if return_arrays:
                 lls_[i] = ll_
+                i += 1
         if return_arrays:
             return rho_dot_min_ll_, min_ll_, rho_dots, lls_
         return rho_dot_min_ll_, min_ll_
