@@ -24,7 +24,7 @@ except:
 import time
 
 try:
-    from numba import jit
+    from numba import jit, autojit
 except:
     print("Numba not installed")
 
@@ -251,7 +251,7 @@ class Pbh(object):
         return self.photon_df.ts
 
 
-    @jit
+    @autojit
     def psf_func(self, theta2, psf_width, N=100):
         return 1.71 * N / 2. / np.pi / psf_width ** 2 / np.cosh(np.sqrt(theta2) / psf_width)
         # equivalently:
@@ -274,7 +274,7 @@ class Pbh(object):
         EL_bin = np.digitize(EL, self.EL_grid) - 1
         return self.psf_lookup[E_bin, EL_bin]
 
-    @jit
+    @autojit
     def get_psf_lists(self):
         """
         This thing is slow...
@@ -295,7 +295,7 @@ class Pbh(object):
             #    print "Got a None psf, energy is ", self.photon_df.at[i, 'Es'], "EL is ", EL_
             #print "PSF,", self.photon_df.psfs.at[i]
 
-    @jit
+    @autojit
     def get_angular_distance(self, coord1, coord2):
         """
         coord1 and coord2 are in [ra, dec] format in degrees
@@ -304,7 +304,7 @@ class Pbh(object):
                                  + np.cos(deg2rad(coord1[1])) * np.cos(deg2rad(coord2[1])) *
                                  np.cos(deg2rad(coord1[0]) - deg2rad(coord2[0]))))
 
-    @jit
+    @autojit
     def get_all_angular_distance(self, coords, cent_coord):
         assert coords.shape[1] == 2
         dists = np.zeros(coords.shape[0])
@@ -346,7 +346,7 @@ class Pbh(object):
         else:
             return "Input prob value not supported"
 
-    @jit
+    @autojit
     def centroid_log_likelihood(self, cent_coord, coords, psfs):
         """
         returns ll=-2*ln(L)
@@ -361,7 +361,7 @@ class Pbh(object):
         #Normalized by the number of events!
         return ll / psfs.shape[0]
 
-    @jit
+    @autojit
     def minimize_centroid_ll(self, coords, psfs):
         init_centroid = np.mean(coords, axis=0)
         results = minimize(self.centroid_log_likelihood, init_centroid, args=(coords, psfs), method='L-BFGS-B')
@@ -542,7 +542,7 @@ class Pbh(object):
         #return self.photon_df.burst_sizes
         return burst_hist, self.burst_dict
 
-    @jit
+    @autojit
     def singlet_remover(self, slice_index):
         """
         :param slice_index: a np array of events' indices in photon_df
@@ -664,6 +664,7 @@ class Pbh(object):
         self.burst_dict = self._burst_dict.copy()
         return self.burst_dict
 
+    @autojit
     def burst_counting(self):
         """
         :return: nothing but fills self.photon_df.burst_sizes, during the process self._burst_dict is emptied!
@@ -680,7 +681,6 @@ class Pbh(object):
                 if evt in self._burst_dict[key] and key != largest_burst_number:
                     #self._burst_dict[key].remove(evt)
                     self._burst_dict[key] = np.delete(self._burst_dict[key], np.where(self._burst_dict[key] == evt))
-
         # Delete the largest burst, which is processed above
         self._burst_dict.pop(largest_burst_number, None)
         # repeat while there are unprocessed bursts in _burst_dict
@@ -828,12 +828,18 @@ class Pbh(object):
             print("The value of the expected number of bursts (eq 8.9) is %.2f" % n_ex)
         return n_ex
 
+    @autojit
+    def ll(self, n_on, n_off, n_expected):
+        #eq 8.13 without the sum
+        return -2. * (-1. * n_expected + n_on * np.log(n_off + n_expected))
+    """
     def ll(self, n_on, n_off, n_expected, verbose=False):
         #eq 8.13 without the sum
         ll_ = -2. * (-1. * n_expected + n_on * np.log(n_off + n_expected))
         if verbose:
             print("The likelihood value term for the given burst size (eq 8.13 before sum) is %.2f" % ll_)
         return ll_
+    """
 
     def get_significance(self, verbose=False):
         residual_dict = self.residual_dict
@@ -881,6 +887,7 @@ class Pbh(object):
             lls_[i] = self.get_ll(rho_dot_, burst_size, t_window, verbose=verbose)
         return rho_dots, lls_
 
+    @autojit
     def get_minimum_ll(self, burst_size, t_window, rho_dots=np.arange(0., 3.e5, 100), return_arrays=True,
                        verbose=False):
         #search rho_dots for the minimum -2lnL
@@ -1064,6 +1071,88 @@ class Pbh(object):
         ax.set_ylabel("Dec")
         return ax
 
+class Pbh_combined(Pbh):
+    def __init__(self, window_size):
+        super(Pbh_combined, self).__init__()
+        # the cut on -2lnL for rho_dot that gives an observed burst size
+        #!!!note how this is different from the ll_cut on the centroid in the super class
+        self.delta_ll_cut = 6.63
+        self.photon_df = None
+        self.pbhs = []
+        self.runNums = []
+        self.sig_burst_hist = {}
+        self.avg_bkg_hist = {}
+        self.residual_dict = {}
+        #this is important, keep track of the number of runs to average over
+        self.n_runs = 0
+        #total exposure in unit of year
+        self.total_time_year = 0
+        self.effective_volume = 0.0
+        #Make the class for a specific window size
+        self.window_size = window_size
+        #Some global parameters
+        self.bkg_method = "scramble"
+        self.rando_method = "cell"
+        self.N_scramble = 10
+        self.verbose = False
+
+    def add_pbh(self, pbh):
+        #When adding a new run, we want to update:
+        # 1. self.n_runs
+        # 2. self.total_time_year
+        # 3. self.sig_burst_hist
+        # 4. self.avg_bkg_hist
+        # 5. self.effective_volume
+        self.pbhs.append(pbh)
+        # 1.
+        previous_n_runs = self.n_runs
+        self.n_runs += 1
+        # 2.
+        if not hasattr(pbh, 'total_time_year'):
+            pbh.total_time_year = (pbh.tOn*(1.-pbh.DeadTimeFracOn))/31536000.
+        previous_total_time_year = self.total_time_year
+        self.total_time_year += pbh.total_time_year
+        # 3 and 4 and residual
+        current_all_burst_sizes = self.get_all_burst_sizes()
+        new_all_burst_sizes = current_all_burst_sizes.union(set(k for dic in [pbh.sig_burst_hist, pbh.avg_bkg_hist] for k in dic.keys()))
+        for key_ in new_all_burst_sizes:
+            #first zero-pad the new pbh hists with all possible burst sizes
+            key_ = int(key_)
+            if key_ not in pbh.sig_burst_hist:
+                pbh.sig_burst_hist[key_] = 0
+            if key_ not in pbh.avg_bkg_hist:
+                pbh.avg_bkg_hist[key_] = 0
+        for key_ in new_all_burst_sizes:
+            #now add all the bursts in pbh to self
+            key_ = int(key_)
+            if key_ not in self.sig_burst_hist:
+                self.sig_burst_hist[key_] = pbh.sig_burst_hist[key_]
+            else:
+                self.sig_burst_hist[key_] += pbh.sig_burst_hist[key_]
+            if key_ not in self.avg_bkg_hist:
+                self.avg_bkg_hist[key_] = pbh.avg_bkg_hist[key_]
+            else:
+                self.avg_bkg_hist[key_] += pbh.avg_bkg_hist[key_]
+            self.residual_dict[key_] = self.sig_burst_hist[key_] - self.avg_bkg_hist[key_]
+
+        # 5.
+        self.effective_volume = self.effective_volume * previous_total_time_year + pbh.total_time_year * pbh.V_eff()
+
+    def get_all_burst_sizes(self):
+        #returns a set, not a dict
+        all_burst_sizes = set(k for dic in [self.sig_burst_hist, self.avg_bkg_hist] for k in dic.keys())
+        return all_burst_sizes
+
+    def add_run(self, runNum):
+        pbh_ = Pbh()
+        pbh_.get_TreeWithAllGamma(runNum=runNum, nlines=None)
+        _sig_burst_hist, _sig_burst_dict = pbh.sig_burst_search(window_size=self.window_size, verbose=self.verbose)
+        _avg_bkg_hist, _bkg_burst_dicts = pbh.estimate_bkg_burst(window_size=self.window_size, rando_method=self.rando_method,
+                                                               method=self.bkg_method,copy=True, n_scramble=self.N_scramble,
+                                                               return_burst_dict=True, verbose=self.verbose)
+        pbh_.getRunSummary()
+        self.add_pbh(pbh_)
+        self.runNums.append(runNum)
 
 class powerlaw:
     # Class can calculate a power-law pdf, cdf from x_min to x_max,
