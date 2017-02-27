@@ -337,3 +337,5 @@ class PyVAPlotCam:
                                      yCenter + radius * math.sin(2 * math.pi * float(i) / float(numSides) + rotAngle)]
 
         return pixVertices
+
+
