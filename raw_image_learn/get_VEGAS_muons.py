@@ -14,7 +14,8 @@ import os.path
 #f = "/raid/biggams/qfeng/data/PG1553/81634UCORmedWinterMuonSt4.root"
 
 def get_muon_charge(f, outfile_base="81635_muon", non_muon_outfile_base="81635_non_muon", num_of_non_muon=5000, dump=True,
-                    outdir="muon_hunter_images", dpi=144, load=True, cut_radius=0.0, cut_radius_upper=None):
+                    outdir="muon_hunter_images", dpi=144, load=True, cut_radius=0.0, cut_radius_upper=None,
+                    cleaning={'img': 5.0, 'brd': 2.5}):
     if os.path.isfile(outfile_base+"_charge.hdf5") and os.path.isfile(outfile_base+"_evtNum_telID.hdf5") and load:
         print("Loading events")
         m_allCharges = load_hdf5(outfile_base + "_charge.hdf5")
@@ -26,7 +27,7 @@ def get_muon_charge(f, outfile_base="81635_muon", non_muon_outfile_base="81635_n
         m_evtNums, m_tels, m_allCharges = read_muon_data(f, tels=[0, 1, 2, 3], read_charge=True, save_muon=True,
                                           cut_radius=cut_radius, cut_radius_upper=cut_radius_upper,
                                           outfile_base=outfile_base, save_non_muon=True, num_of_non_muon=num_of_non_muon,
-                                          non_muon_outfile_base=non_muon_outfile_base)
+                                          non_muon_outfile_base=non_muon_outfile_base, cleaning=cleaning)
 
     nm_allCharges = load_hdf5(non_muon_outfile_base+"_charge.hdf5")
     nm_EvtNumsTelIDs = load_hdf5(non_muon_outfile_base+"_evtNum_telID.hdf5")
@@ -51,11 +52,22 @@ def get_muon_charge(f, outfile_base="81635_muon", non_muon_outfile_base="81635_n
     return m_evtNums, m_tels, m_allCharges, nm_evtNums, nm_tels, nm_allCharges
 
 
-f = "/raid/biggams/qfeng/data/PG1553/81634UCORmedWinterMuonSt4.root"
-m_evtNums, m_tels, m_allCharges = read_muon_data(f, tels=[0, 1, 2, 3], read_charge=True, save_muon=False,
-                                          cut_radius=0.1, cut_radius_upper=None,
-                                          outfile_base="81634_test_muon", save_non_muon=False, num_of_non_muon=100,
-                                          non_muon_outfile_base="81634_test_non_muon")
+def test():
+    f = "/raid/biggams/qfeng/data/PG1553/81214UCORmedWinterMuonSt4.root"
+    m_evtNums, m_tels, m_allCharges = read_muon_data(f, tels=[0, 1, 2, 3], read_charge=True, save_muon=False,
+                                              cut_radius=0.5, cut_radius_upper=None,
+                                              outfile_base="81214_test_0p5_muon", save_non_muon=False, num_of_non_muon=100,
+                                              non_muon_outfile_base="81214_test_0p5_non_muon")
+
+    f = "/raid/biggams/qfeng/data/1ES1959/2015/78598UCORmedWinterMuonSt4.root"
+    evtNums, allCharges = read_st2_calib_channel_charge(f, tels=[0, 1, 2, 3], maskL2=True,
+                                                        l2channels=[[110, 249, 255, 404, 475, 499],
+                                                                    [128, 173, 259, 498, 499],
+                                                                    [37, 159, 319, 451, 499], [99, 214, 333, 499]],
+                                                        start_event=None, stop_event=None, evtlist=[610043],
+                                                        verbose=False,
+                                                        cleaning={'img': 5.0, 'brd': 2.5})
+
 
 class PyVAPlotCam:
     ############################################################################
