@@ -14,7 +14,7 @@ import os.path
 #f = "/raid/biggams/qfeng/data/PG1553/81634UCORmedWinterMuonSt4.root"
 
 def get_muon_charge(f, outfile_base="81635_muon", non_muon_outfile_base="81635_non_muon", num_of_non_muon=5000, dump=True,
-                    outdir="muon_hunter_images", dpi=144, load=True):
+                    outdir="muon_hunter_images", dpi=144, load=True, cut_radius=0.0, cut_radius_upper=None):
     if os.path.isfile(outfile_base+"_charge.hdf5") and os.path.isfile(outfile_base+"_evtNum_telID.hdf5") and load:
         print("Loading events")
         m_allCharges = load_hdf5(outfile_base + "_charge.hdf5")
@@ -24,6 +24,7 @@ def get_muon_charge(f, outfile_base="81635_muon", non_muon_outfile_base="81635_n
     else:
         print("Reading events from root file")
         m_evtNums, m_tels, m_allCharges = read_muon_data(f, tels=[0, 1, 2, 3], read_charge=True, save_muon=True,
+                                          cut_radius=cut_radius, cut_radius_upper=cut_radius_upper,
                                           outfile_base=outfile_base, save_non_muon=True, num_of_non_muon=num_of_non_muon,
                                           non_muon_outfile_base=non_muon_outfile_base)
 
