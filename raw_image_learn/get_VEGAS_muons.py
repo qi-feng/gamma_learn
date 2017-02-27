@@ -51,7 +51,11 @@ def get_muon_charge(f, outfile_base="81635_muon", non_muon_outfile_base="81635_n
     return m_evtNums, m_tels, m_allCharges, nm_evtNums, nm_tels, nm_allCharges
 
 
-
+f = "/raid/biggams/qfeng/data/PG1553/81634UCORmedWinterMuonSt4.root"
+m_evtNums, m_tels, m_allCharges = read_muon_data(f, tels=[0, 1, 2, 3], read_charge=True, save_muon=False,
+                                          cut_radius=0.1, cut_radius_upper=None,
+                                          outfile_base="81634_test_muon", save_non_muon=False, num_of_non_muon=100,
+                                          non_muon_outfile_base="81634_test_non_muon")
 
 class PyVAPlotCam:
     ############################################################################
