@@ -39,14 +39,14 @@ def get_muon_charge(f, outfile_base="81635_muon", non_muon_outfile_base="81635_n
             # cam.buildCamera(draw_pixNum=False)
             # cam.draw(drawColorbar=False, draw_pixNum=False)
             cam.draw(drawColorbar=False, draw_pixNum=False, cm=plt.cm.jet)
-            plt.savefig(outdir+"/"+str(outfile_base)+"_evt" + str(int(m_evtNums[i])) + "_tel"+str(m_tels[i])+".jpeg", dpi=dpi)
+            plt.savefig(outdir+"/"+str(outfile_base)+"_evt" + str(int(m_evtNums[i])) + "_tel"+str("{:.0f}".format(m_tels[i]))+".jpeg", dpi=dpi)
             #cam.show()
 
 
         for i in range(nm_allCharges.shape[-1]):
             cam = PyVAPlotCam(nm_allCharges[:, i], fig=plt.figure(figsize=(7, 7)), ax=plt.subplot(111))
             cam.draw(drawColorbar=False, draw_pixNum=False, cm=plt.cm.jet)
-            plt.savefig(outdir+"/"+str(non_muon_outfile_base)+"_evt" + str(int(nm_evtNums[i])) + "_tel"+str(nm_tels[i])+".jpeg", dpi=dpi)
+            plt.savefig(outdir+"/"+str(non_muon_outfile_base)+"_evt" + str(int(nm_evtNums[i])) + "_tel"+str("{:.0f}".format(m_tels[i]))+".jpeg", dpi=dpi)
 
     return m_evtNums, m_tels, m_allCharges, nm_evtNums, nm_tels, nm_allCharges
 
