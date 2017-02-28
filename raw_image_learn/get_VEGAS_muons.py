@@ -10,6 +10,7 @@ import math
 import numpy as np
 
 import os.path
+import sys
 
 #f = "/raid/biggams/qfeng/data/PG1553/81634UCORmedWinterMuonSt4.root"
 
@@ -50,6 +51,52 @@ def get_muon_charge(f, outfile_base="81635_muon", non_muon_outfile_base="81635_n
             plt.savefig(outdir+"/"+str(non_muon_outfile_base)+"_evt" + str(int(nm_evtNums[i])) + "_tel"+str("{:.0f}".format(m_tels[i]))+".jpeg", dpi=dpi)
 
     return m_evtNums, m_tels, m_allCharges, nm_evtNums, nm_tels, nm_allCharges
+
+
+def get_muon_charge_load_evt(st2file, save_image_dir="muon_hunter_images_clean", #run_num=81783,
+                        outfile_base="hide_label", save_text="clean_muon_events.txt",
+                        start_event=None, stop_event=None, evtlist="../81783_muon_evtNum_telID.hdf5",
+                        ntubes=5, dpi=144):
+    #evt_file = "../"+str(run_num)+"_muon_evtNum_telID.hdf5"
+    evt_file = evtlist
+    evt_tels = load_hdf5(evt_file)
+    evts = evt_tels[:,0]
+    tels = evt_tels[:,1]
+    print("Reading events from root file")
+    evtNums, allCharges = read_st2_calib_channel_charge(st2file, tels=[0, 1, 2, 3], maskL2=True,
+                                  l2channels=[[110, 249, 255, 404, 475, 499], [128, 173, 259, 498, 499],
+                                              [37, 159, 319, 451, 499], [99, 214, 333, 499]],
+                                  start_event=start_event, stop_event=stop_event, evtlist=evts, verbose=False,
+                                  cleaning={'img': 5.0, 'brd': 2.5})
+    #allCharge[telID][chanID][evt_count]
+    try:
+        # Opening file stream for light curve detection results
+        print('Opening file stream for writing results.\n')
+        outfile = open(save_text, 'a')
+    except IOError:
+        print('There was an error opening file {0}'.format(save_text))
+        sys.exit()
+
+    n_evts = allCharges.shape[2]
+    print("saving_images")
+
+    for i, this_evt in enumerate(evts):
+        telID = tels[i]
+        # Ntubes cut
+        if np.sum(allCharges[telID, :, i] != 0) < ntubes:
+            continue
+        #this_image = charge_to_image_one_tel(allCharges[telID, :, i:i+1])
+        #this_evt = evtNums[i]
+        outfile.write(str(this_evt) + ', ' +str(telID) + '\n')
+        cam = PyVAPlotCam(allCharges[telID, :, i], fig=plt.figure(figsize=(7, 7)), ax=plt.subplot(111))
+        # cam.buildCamera(draw_pixNum=False)
+        # cam.draw(drawColorbar=False, draw_pixNum=False)
+        cam.draw(drawColorbar=False, draw_pixNum=False, cm=plt.cm.jet)
+        plt.savefig(
+            save_image_dir + "/" + str(outfile_base) + "_evt" + str(int(this_evt)) + "_tel" + str(telID) + ".jpeg",
+            dpi=dpi)
+
+
 
 
 def test():

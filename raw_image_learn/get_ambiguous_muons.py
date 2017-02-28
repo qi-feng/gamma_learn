@@ -78,6 +78,66 @@ def get_ambiguous_muons(muon_cnn, st2file, save_image_dir="muon_hunter_ambiguous
                     save_image_dir + "/" + str(outfile_base) + "_evt" + str(int(this_evt)) + "_tel" + str(telID) + ".jpeg",
                     dpi=dpi)
 
+def get_cnn_muons(muon_cnn, st2file, save_image_dir="muon_hunter_cnn_muon_images",
+                        outfile_base="hide_label", save_text="cnn_muon_events.txt", outfile_base_non_muon="hide_label",
+                        save_non_muon_image_dir="muon_hunter_cnn_non_muon_images", save_non_muon_text="cnn_non_muon_events.txt",
+                        start_event=None, stop_event=None, evtlist=None, score_lower=0.9, score_upper=1.0,
+                        score_lower_non_muon=0.0, score_upper_non_muon=0.1, ntubes=5, dpi=144):
+    evtNums, allCharges = read_st2_calib_channel_charge(st2file, tels=[0, 1, 2, 3], maskL2=True,
+                                  l2channels=[[110, 249, 255, 404, 475, 499], [128, 173, 259, 498, 499],
+                                              [37, 159, 319, 451, 499], [99, 214, 333, 499]],
+                                  start_event=start_event, stop_event=stop_event, evtlist=evtlist, verbose=False,
+                                  cleaning={'img': 5.0, 'brd': 2.5})
+    #allCharge[telID][chanID][evt_count]
+    model = muon_cnn.get_model()
+
+    #ambiguous_evtNums = []
+    #ambiguous_scores = []
+    try:
+        # Opening file stream for light curve detection results
+        print('Opening file stream for writing results.\n')
+        outfile = open(save_text, 'a')
+        outfile_nm = open(save_non_muon_text, 'a')
+    except IOError:
+        print('There was an error opening file {0}'.format(save_text))
+        print('or an error opening file {0}'.format(save_non_muon_text))
+        sys.exit()
+
+    n_evts = allCharges.shape[2]
+    for i in range(n_evts):
+        for telID in range(4):
+            # Ntubes cut
+            if np.sum(allCharges[telID, :, i] != 0) < ntubes:
+                continue
+            this_image = charge_to_image_one_tel(allCharges[telID, :, i:i+1])
+            this_predict = model.predict_proba(this_image)
+            #print(this_predict)
+            if this_predict[0,1]>score_lower and this_predict[0,1]<score_upper:
+                this_evt = evtNums[i]
+                outfile.write(str(this_evt) + ', ' +str(telID) + ', ' + str(this_predict) + '\n')
+
+                cam = PyVAPlotCam(allCharges[telID, :, i], fig=plt.figure(figsize=(7, 7)), ax=plt.subplot(111))
+                # cam.buildCamera(draw_pixNum=False)
+                # cam.draw(drawColorbar=False, draw_pixNum=False)
+                cam.draw(drawColorbar=False, draw_pixNum=False, cm=plt.cm.jet)
+                plt.savefig(
+                    save_image_dir + "/" + str(outfile_base) + "_evt" + str(int(this_evt)) + "_tel" + str(telID) + ".jpeg",
+                    dpi=dpi)
+
+            if this_predict[0,1]>score_lower_non_muon and this_predict[0,1]<score_upper_non_muon:
+                this_evt = evtNums[i]
+                outfile_nm.write(str(this_evt) + ', ' +str(telID) + ', ' + str(this_predict) + '\n')
+
+                cam = PyVAPlotCam(allCharges[telID, :, i], fig=plt.figure(figsize=(7, 7)), ax=plt.subplot(111))
+                # cam.buildCamera(draw_pixNum=False)
+                # cam.draw(drawColorbar=False, draw_pixNum=False)
+                cam.draw(drawColorbar=False, draw_pixNum=False, cm=plt.cm.jet)
+                plt.savefig(
+                    save_image_dir + "/" + str(outfile_base_non_muon) + "_evt" + str(int(this_evt)) + "_tel" + str(telID) + ".jpeg",
+                    dpi=dpi)
+
+
+
 
 class PyVAPlotCam:
     ############################################################################
