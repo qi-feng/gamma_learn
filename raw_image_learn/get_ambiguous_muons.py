@@ -133,7 +133,7 @@ def get_cnn_muons(muon_cnn, st2file, save_image_dir="muon_hunter_cnn_muon_images
                 # cam.draw(drawColorbar=False, draw_pixNum=False)
                 cam.draw(drawColorbar=False, draw_pixNum=False, cm=plt.cm.jet)
                 plt.savefig(
-                    save_image_dir + "/" + str(outfile_base_non_muon) + "_evt" + str(int(this_evt)) + "_tel" + str(telID) + ".jpeg",
+                    save_non_muon_image_dir + "/" + str(outfile_base_non_muon) + "_evt" + str(int(this_evt)) + "_tel" + str(telID) + ".jpeg",
                     dpi=dpi)
     outfile.close()
     outfile_nm.close()
