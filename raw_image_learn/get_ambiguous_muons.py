@@ -124,7 +124,7 @@ def get_cnn_muons(muon_cnn, st2file, save_image_dir="muon_hunter_cnn_muon_images
                     save_image_dir + "/" + str(outfile_base) + "_evt" + str(int(this_evt)) + "_tel" + str(telID) + ".jpeg",
                     dpi=dpi)
 
-            if this_predict[0,1]>score_lower_non_muon and this_predict[0,1]<score_upper_non_muon:
+            elif this_predict[0,1]>score_lower_non_muon and this_predict[0,1]<score_upper_non_muon:
                 this_evt = evtNums[i]
                 outfile_nm.write(str(this_evt) + ', ' +str(telID) + ', ' + str(this_predict) + '\n')
 
@@ -135,7 +135,8 @@ def get_cnn_muons(muon_cnn, st2file, save_image_dir="muon_hunter_cnn_muon_images
                 plt.savefig(
                     save_image_dir + "/" + str(outfile_base_non_muon) + "_evt" + str(int(this_evt)) + "_tel" + str(telID) + ".jpeg",
                     dpi=dpi)
-
+    outfile.close()
+    outfile_nm.close()
 
 
 
