@@ -82,7 +82,8 @@ def get_cnn_muons(muon_cnn, st2file, save_image_dir="muon_hunter_cnn_muon_images
                         outfile_base="hide_label", save_text="cnn_muon_events.txt", outfile_base_non_muon="hide_label",
                         save_non_muon_image_dir="muon_hunter_cnn_non_muon_images", save_non_muon_text="cnn_non_muon_events.txt",
                         start_event=None, stop_event=None, evtlist=None, score_lower=0.9, score_upper=1.0,
-                        score_lower_non_muon=0.0, score_upper_non_muon=0.1, ntubes=5, dpi=144):
+                        score_lower_non_muon=0.0, score_upper_non_muon=0.1, ntubes=5, dpi=144, non_muon_cap=10000):
+    print("reading events from root file")
     evtNums, allCharges = read_st2_calib_channel_charge(st2file, tels=[0, 1, 2, 3], maskL2=True,
                                   l2channels=[[110, 249, 255, 404, 475, 499], [128, 173, 259, 498, 499],
                                               [37, 159, 319, 451, 499], [99, 214, 333, 499]],
@@ -104,6 +105,7 @@ def get_cnn_muons(muon_cnn, st2file, save_image_dir="muon_hunter_cnn_muon_images
         sys.exit()
 
     n_evts = allCharges.shape[2]
+    non_muon_count = 0
     for i in range(n_evts):
         for telID in range(4):
             # Ntubes cut
@@ -125,6 +127,9 @@ def get_cnn_muons(muon_cnn, st2file, save_image_dir="muon_hunter_cnn_muon_images
                     dpi=dpi)
 
             elif this_predict[0,1]>score_lower_non_muon and this_predict[0,1]<score_upper_non_muon:
+                if non_muon_count > non_muon_cap:
+                    continue
+                non_muon_count += 1
                 this_evt = evtNums[i]
                 outfile_nm.write(str(this_evt) + ', ' +str(telID) + ', ' + str(this_predict) + '\n')
 
