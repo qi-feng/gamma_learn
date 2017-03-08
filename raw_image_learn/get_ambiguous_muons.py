@@ -36,6 +36,12 @@ def train_muon_cnn_4runs(save=True, load=False, outfile="muon_cnn_4file_default.
     return muon_cnn
 
 
+def load_cnn_model(model_file="muon_cnn_16file_update.json", weight_file="muon_cnn_16file_update_weights.hdf5"):
+    muon_cnn = CNN()
+    muon_cnn.load_keras_model(model_file, weight_file)
+    return muon_cnn
+
+
 def read_train_xy_list(trainx_fs, trainy_fs, testx_fs, testy_fs):
     train_x = np.zeros((0,1,54,54))
     train_y = np.zeros((0))
