@@ -80,6 +80,7 @@ def get_muon_charge_load_evt(st2file, save_image_dir="muon_hunter_images_clean",
     n_evts = allCharges.shape[2]
     print("saving_images")
 
+
     for i, this_evt in enumerate(evts):
         telID = tels[i]
         # Ntubes cut
@@ -88,32 +89,130 @@ def get_muon_charge_load_evt(st2file, save_image_dir="muon_hunter_images_clean",
         #this_image = charge_to_image_one_tel(allCharges[telID, :, i:i+1])
         #this_evt = evtNums[i]
         outfile.write(str(this_evt) + ', ' +str(telID) + '\n')
-        cam = PyVAPlotCam(allCharges[telID, :, i], fig=plt.figure(figsize=(7, 7)), ax=plt.subplot(111))
-        # cam.buildCamera(draw_pixNum=False)
-        # cam.draw(drawColorbar=False, draw_pixNum=False)
-        cam.draw(drawColorbar=False, draw_pixNum=False, cm=plt.cm.jet)
-        plt.savefig(
-            save_image_dir + "/" + str(outfile_base) + "_evt" + str(int(this_evt)) + "_tel" + str(telID) + ".jpeg",
-            dpi=dpi)
+        make_cam_plot(allCharges[telID, :, i], fig=plt.figure(figsize=(7, 7)), ax=plt.subplot(111),
+                      drawColorbar=False, draw_pixNum=False, cm=plt.cm.jet,
+                      save_image_dir=save_image_dir,
+                      outfile_base=str(outfile_base) + "_evt" + str(int(this_evt)) + "_tel" + str(telID),
+                      dpi=dpi)
+
+
+def make_cam_plot(charges, fig=plt.figure(figsize=(7, 7)), ax=plt.subplot(111),
+                  drawColorbar=False, draw_pixNum=False, cm=plt.cm.jet, dpi=144,
+                  save_image_dir="muon_hunter_images_clean", outfile_base="hide_label"):
+    cam = PyVAPlotCam(charges, fig=fig, ax=ax)
+    # cam.buildCamera(draw_pixNum=False)
+    # cam.draw(drawColorbar=False, draw_pixNum=False)
+    cam.draw(drawColorbar=drawColorbar, draw_pixNum=draw_pixNum, cm=cm)
+    plt.savefig(
+        save_image_dir + "/" + str(outfile_base)  + ".jpeg",
+        dpi=dpi)
+
+def get_muons_load_evtlist(fs, nm_fs, runNums, st2files, save_image_dir="muon_4files_images_clean",
+                           save_non_muon_image_dir="non_muon_4files_images_clean",
+                           outfile_base="hide_label", split_ratio=0.25,
+                           outfile_base_non_muon="hide_label", dump_raw_image=True,
+                           ntubes=5, dpi=144, save_oversampled=None
+                          ):
+        if isinstance(fs, str):
+            fs = [fs]
+        if isinstance(nm_fs, str):
+            nm_fs = [nm_fs]
+        if isinstance(runNums, str):
+            runNums = [runNums]
+        train_x = np.zeros((0, 1, 54, 54))
+        train_y = np.zeros((0))
+        test_x = np.zeros((0, 1, 54, 54))
+        test_y = np.zeros((0))
+        for f, nm_f, runNum, st2file in zip(fs, nm_fs, runNums, st2files):
+            outfile_base_ = str(runNum) + outfile_base
+            outfile_base_non_muon_ = str(runNum) + outfile_base_non_muon
+            evt_tels = load_hdf5(f)
+            evts = evt_tels[:, 0]
+            tels = evt_tels[:, 1]
+            evt_tels_nm = load_hdf5(nm_f)
+            evts_nm = evt_tels_nm[:, 0]
+            tels_nm = evt_tels_nm[:, 1]
+            allCharges_one_tel = np.zeros((500, evts.shape[0]))
+            allCharges_one_tel_nm = np.zeros((500, evts_nm.shape[0]))
+            print("Reading events from root file")
+            #allCharge[telID][l2chan][evt_count]
+            evtNums, allCharges = read_st2_calib_channel_charge(st2file, tels=[0, 1, 2, 3], maskL2=True,
+                                                                l2channels=[[110, 249, 255, 404, 475, 499],
+                                                                            [128, 173, 259, 498, 499],
+                                                                            [37, 159, 319, 451, 499],
+                                                                            [99, 214, 333, 499]],
+                                                                start_event=None, stop_event=None,
+                                                                evtlist=evts, verbose=False,
+                                                                cleaning={'img': 5.0, 'brd': 2.5})
+            evtNums_nm, allCharges_nm = read_st2_calib_channel_charge(st2file, tels=[0, 1, 2, 3], maskL2=True,
+                                                                l2channels=[[110, 249, 255, 404, 475, 499],
+                                                                            [128, 173, 259, 498, 499],
+                                                                            [37, 159, 319, 451, 499],
+                                                                            [99, 214, 333, 499]],
+                                                                start_event=None, stop_event=None,
+                                                                evtlist=evts_nm, verbose=False,
+                                                                cleaning={'img': 5.0, 'brd': 2.5})
+
+            for i, this_evt in enumerate(evts):
+                telID = tels[i]
+                # Ntubes cut
+                if np.sum(allCharges[telID, :, i] != 0) < ntubes:
+                    continue
+                allCharges_one_tel[:, i] = allCharges[telID, :, i]
+                if dump_raw_image:
+                    # this_image = charge_to_image_one_tel(allCharges[telID, :, i:i+1])
+                    # this_evt = evtNums[i]
+                    make_cam_plot(allCharges[telID, :, i], fig=plt.figure(figsize=(7, 7)), ax=plt.subplot(111),
+                                  drawColorbar=False, draw_pixNum=False, cm=plt.cm.jet,
+                                  save_image_dir=save_image_dir,
+                                  outfile_base=str(outfile_base_) + "_evt" + str(int(this_evt)) + "_tel" + str(telID),
+                                  dpi=dpi)
+
+
+            for i, this_evt in enumerate(evts_nm):
+                telID = tels_nm[i]
+                # Ntubes cut
+                if np.sum(allCharges_nm[telID, :, i] != 0) < ntubes:
+                    continue
+                allCharges_one_tel_nm[:, i] = allCharges_nm[telID, :, i]
+                if dump_raw_image:
+                    # this_image = charge_to_image_one_tel(allCharges[telID, :, i:i+1])
+                    # this_evt = evtNums[i]
+                    make_cam_plot(allCharges_nm[telID, :, i], fig=plt.figure(figsize=(7, 7)), ax=plt.subplot(111),
+                                  drawColorbar=False, draw_pixNum=False, cm=plt.cm.jet,
+                                  save_image_dir=save_non_muon_image_dir,
+                                  outfile_base=str(outfile_base_non_muon_) + "_evt" + str(int(this_evt)) + "_tel" + str(telID),
+                                  dpi=dpi)
+
+            sig_images = charge_to_image_one_tel(allCharges_one_tel)
+            bkg_images = charge_to_image_one_tel(allCharges_one_tel_nm)
+            x, y = generate_xy(sig_images, bkg_images)
+            if split_ratio <= 0:
+                train_x = np.concatenate([train_x, x])
+                train_y = np.concatenate([train_y, y])
+            else:
+                train_x_, train_y_, test_x_, test_y_ = split_train_test(x, y, ratio=split_ratio)
+                train_x = np.concatenate([train_x, train_x_])
+                train_y = np.concatenate([train_y, train_y_])
+                test_x = np.concatenate([test_x, test_x_])
+                test_y = np.concatenate([test_y, test_y_])
+
+
+        if split_ratio <= 0:
+            if save_oversampled is not None:
+                save_hdf5(train_x, "train_x"+save_oversampled+".hdf5")
+                save_hdf5(train_y, "train_y" + save_oversampled + ".hdf5")
+            return train_x, train_y
+        if save_oversampled is not None:
+            save_hdf5(train_x, "train_x" + save_oversampled + ".hdf5")
+            save_hdf5(train_y, "train_y" + save_oversampled + ".hdf5")
+            save_hdf5(test_x, "test_x" + save_oversampled + ".hdf5")
+            save_hdf5(test_y, "test_y" + save_oversampled + ".hdf5")
+        return train_x, train_y, test_x, test_y
 
 
 
 
-def test():
-    f = "/raid/biggams/qfeng/data/PG1553/81214UCORmedWinterMuonSt4.root"
-    m_evtNums, m_tels, m_allCharges = read_muon_data(f, tels=[0, 1, 2, 3], read_charge=True, save_muon=False,
-                                              cut_radius=0.5, cut_radius_upper=None,
-                                              outfile_base="81214_test_0p5_muon", save_non_muon=False, num_of_non_muon=100,
-                                              non_muon_outfile_base="81214_test_0p5_non_muon")
-
-    f = "/raid/biggams/qfeng/data/1ES1959/2015/78598UCORmedWinterMuonSt4.root"
-    evtNums, allCharges = read_st2_calib_channel_charge(f, tels=[0, 1, 2, 3], maskL2=True,
-                                                        l2channels=[[110, 249, 255, 404, 475, 499],
-                                                                    [128, 173, 259, 498, 499],
-                                                                    [37, 159, 319, 451, 499], [99, 214, 333, 499]],
-                                                        start_event=None, stop_event=None, evtlist=[610043],
-                                                        verbose=False,
-                                                        cleaning={'img': 5.0, 'brd': 2.5})
 
 
 class PyVAPlotCam:

@@ -5,7 +5,7 @@ from VNN.utils.image import *
 #from raw_image_learn.PyVAPlotCam import *
 import numpy as np
 import sys
-#import os
+import os
 
 import matplotlib.pyplot as plt
 from matplotlib.patches import Polygon
@@ -33,6 +33,44 @@ def train_muon_cnn_4runs(save=True, load=False, outfile="muon_cnn_4file_default.
         muon_cnn.save_keras_model(outfile, weight_file)
 
     return muon_cnn
+
+
+def read_train_xy_list(trainx_fs, trainy_fs, testx_fs, testy_fs):
+    train_x = np.zeros((0,1,54,54))
+    train_y = np.zeros((0))
+    test_x = np.zeros((0,1,54,54))
+    test_y = np.zeros((0))
+
+    for trainx_f, trainy_f, testx_f, testy_f in zip(trainx_fs, trainy_fs, testx_fs, testy_fs):
+        train_x_ = load_hdf5(trainx_f)
+        train_y_ = load_hdf5(trainy_f)
+        test_x_ = load_hdf5(testx_f)
+        test_y_ = load_hdf5(testy_f)
+        train_x = np.concatenate([train_x, train_x_])
+        train_y = np.concatenate([train_y, train_y_])
+        test_x = np.concatenate([test_x, test_x_])
+        test_y = np.concatenate([test_y, test_y_])
+    return train_x, train_y, test_x, test_y
+
+
+def train_muon_cnn(train_x, train_y, test_x, test_y, save=True, load=False,
+                   outfile="muon_cnn_16file_update.json", weight_file="muon_cnn_16file_update_weights.hdf5"):
+
+    muon_cnn = CNN()
+
+    if load and not save:
+        muon_cnn.load_keras_model(outfile, weight_file)
+        return muon_cnn
+
+    muon_cnn.load_data(train_x, train_y, test_x, test_y)
+    muon_cnn.init_model(input_shape=(1, 54, 54), nb_classes=2)
+    #muon_cnn.train(nb_epoch=5)
+    muon_cnn.train(early_stop=10, nb_epoch=50)
+    if save:
+        muon_cnn.save_keras_model(outfile, weight_file)
+
+    return muon_cnn
+
 
 
 def get_ambiguous_muons(muon_cnn, st2file, save_image_dir="muon_hunter_ambiguous_images",
@@ -94,16 +132,21 @@ def get_cnn_muons(muon_cnn, st2file, save_image_dir="muon_hunter_cnn_muon_images
 
     #ambiguous_evtNums = []
     #ambiguous_scores = []
-    try:
-        # Opening file stream for light curve detection results
-        print('Opening file stream for writing results.\n')
-        outfile = open(save_text, 'a')
-        outfile_nm = open(save_non_muon_text, 'a')
-    except IOError:
-        print('There was an error opening file {0}'.format(save_text))
-        print('or an error opening file {0}'.format(save_non_muon_text))
-        sys.exit()
+    #try:
+    #    # Opening file stream for light curve detection results
+    #    print('Opening file stream for writing results.\n')
+    #    outfile = open(save_text, 'a')
+    #    outfile_nm = open(save_non_muon_text, 'a')
+    #except IOError:
+    #    print('There was an error opening file {0}'.format(save_text))
+    #    print('or an error opening file {0}'.format(save_non_muon_text))
+    #    sys.exit()
 
+    if not os.path.exists(save_image_dir):
+        os.makedirs(save_image_dir)
+    if not os.path.exists(save_non_muon_image_dir):
+        os.makedirs(save_non_muon_image_dir)
+        
     n_evts = allCharges.shape[2]
     non_muon_count = 0
     for i in range(n_evts):
@@ -116,7 +159,8 @@ def get_cnn_muons(muon_cnn, st2file, save_image_dir="muon_hunter_cnn_muon_images
             #print(this_predict)
             if this_predict[0,1]>score_lower and this_predict[0,1]<score_upper:
                 this_evt = evtNums[i]
-                outfile.write(str(this_evt) + ', ' +str(telID) + ', ' + str(this_predict) + '\n')
+                with open(save_text, "w") as outfile:
+                    outfile.write(str(this_evt) + ', ' +str(telID) + ', ' + str(this_predict) + '\n')
 
                 cam = PyVAPlotCam(allCharges[telID, :, i], fig=plt.figure(figsize=(7, 7)), ax=plt.subplot(111))
                 # cam.buildCamera(draw_pixNum=False)
@@ -131,7 +175,8 @@ def get_cnn_muons(muon_cnn, st2file, save_image_dir="muon_hunter_cnn_muon_images
                     continue
                 non_muon_count += 1
                 this_evt = evtNums[i]
-                outfile_nm.write(str(this_evt) + ', ' +str(telID) + ', ' + str(this_predict) + '\n')
+                with open(save_non_muon_text, "w") as outfile_nm:
+                    outfile_nm.write(str(this_evt) + ', ' +str(telID) + ', ' + str(this_predict) + '\n')
 
                 cam = PyVAPlotCam(allCharges[telID, :, i], fig=plt.figure(figsize=(7, 7)), ax=plt.subplot(111))
                 # cam.buildCamera(draw_pixNum=False)
@@ -140,8 +185,8 @@ def get_cnn_muons(muon_cnn, st2file, save_image_dir="muon_hunter_cnn_muon_images
                 plt.savefig(
                     save_non_muon_image_dir + "/" + str(outfile_base_non_muon) + "_evt" + str(int(this_evt)) + "_tel" + str(telID) + ".jpeg",
                     dpi=dpi)
-    outfile.close()
-    outfile_nm.close()
+    #outfile.close()
+    #outfile_nm.close()
 
 
 
