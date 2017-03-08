@@ -1,4 +1,5 @@
 from VNN.utils.vegas_io import *
+from VNN.utils.io import *
 from VNN.vmodel.cnn import CNN
 from VNN.utils.squarecam import *
 from VNN.utils.image import *
@@ -116,11 +117,14 @@ def get_ambiguous_muons(muon_cnn, st2file, save_image_dir="muon_hunter_ambiguous
                     save_image_dir + "/" + str(outfile_base) + "_evt" + str(int(this_evt)) + "_tel" + str(telID) + ".jpeg",
                     dpi=dpi)
 
-def get_cnn_muons(muon_cnn, st2file, save_image_dir="muon_hunter_cnn_muon_images",
-                        outfile_base="hide_label", save_text="cnn_muon_events.txt", outfile_base_non_muon="hide_label",
-                        save_non_muon_image_dir="muon_hunter_cnn_non_muon_images", save_non_muon_text="cnn_non_muon_events.txt",
-                        start_event=None, stop_event=None, evtlist=None, score_lower=0.9, score_upper=1.0,
-                        score_lower_non_muon=0.0, score_upper_non_muon=0.1, ntubes=5, dpi=144, non_muon_cap=10000):
+def get_cnn_muons(muon_cnn, st2file, save_image_dir="muon_hunter_cnn_muon_images", run_num=0,
+                  outfile_base="hide_label", save_text="cnn_muon_events.txt", outfile_base_non_muon="hide_label",
+                  save_non_muon_image_dir="muon_hunter_cnn_non_muon_images", save_non_muon_text="cnn_non_muon_events.txt",
+                  start_event=None, stop_event=None, evtlist=None, score_lower=0.9, score_upper=1.0,
+                  score_lower_non_muon=0.0, score_upper_non_muon=0.1, ntubes=5, dpi=144, non_muon_cap=10000,
+                  hdf5_file="cnn_muon_events_oversampled.hdf5", non_muon_hdf5_file="cnn_non_muon_events_oversampled.hdf5",
+                  save_hdf5=True
+                  ):
     print("reading events from root file")
     evtNums, allCharges = read_st2_calib_channel_charge(st2file, tels=[0, 1, 2, 3], maskL2=True,
                                   l2channels=[[110, 249, 255, 404, 475, 499], [128, 173, 259, 498, 499],
@@ -159,6 +163,10 @@ def get_cnn_muons(muon_cnn, st2file, save_image_dir="muon_hunter_cnn_muon_images
             #print(this_predict)
             if this_predict[0,1]>score_lower and this_predict[0,1]<score_upper:
                 this_evt = evtNums[i]
+                if save_hdf5:
+                    update_evts_hdf5(hdf5_file, run_num=run_num, n_tels=1,
+                                     images=this_image, create=True,
+                                     evt_nums=this_evt)
                 with open(save_text, "w") as outfile:
                     outfile.write(str(this_evt) + ', ' +str(telID) + ', ' + str(this_predict) + '\n')
 
@@ -175,6 +183,10 @@ def get_cnn_muons(muon_cnn, st2file, save_image_dir="muon_hunter_cnn_muon_images
                     continue
                 non_muon_count += 1
                 this_evt = evtNums[i]
+                if save_hdf5:
+                    update_evts_hdf5(non_muon_hdf5_file, run_num=run_num, n_tels=1,
+                                     images=this_image, create=True,
+                                     evt_nums=this_evt)
                 with open(save_non_muon_text, "w") as outfile_nm:
                     outfile_nm.write(str(this_evt) + ', ' +str(telID) + ', ' + str(this_predict) + '\n')
 
