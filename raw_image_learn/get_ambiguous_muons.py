@@ -36,6 +36,28 @@ def train_muon_cnn_4runs(save=True, load=False, outfile="muon_cnn_4file_default.
     return muon_cnn
 
 
+def train_muon_cnn_from_hdf5_files(trainx_fs, trainy_fs, testx_fs, testy_fs,
+                                   save=True, load=False,
+                                   outfile="muon_cnn_4file_default_pandas0.18.json", weight_file="muon_cnn_4file_default_weights_pandas0.18.hdf5"):
+    train_x, train_y, test_x, test_y = read_train_xy_list(trainx_fs, trainy_fs, testx_fs, testy_fs)
+
+    muon_cnn = CNN()
+
+    if load and not save:
+        muon_cnn.load_keras_model(outfile, weight_file)
+        return muon_cnn
+
+    muon_cnn.load_data(train_x, train_y, test_x, test_y)
+    muon_cnn.init_model(input_shape=(1, 54, 54), nb_classes=2)
+    #muon_cnn.train(nb_epoch=5)
+    muon_cnn.train(early_stop=10, nb_epoch=50)
+    if save:
+        muon_cnn.save_keras_model(outfile, weight_file)
+
+    return muon_cnn
+
+
+
 def load_cnn_model(model_file="muon_cnn_16file_update.json", weight_file="muon_cnn_16file_update_weights.hdf5"):
     muon_cnn = CNN()
     muon_cnn.load_keras_model(model_file, weight_file)
