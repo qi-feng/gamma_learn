@@ -194,7 +194,7 @@ def get_cnn_muons(muon_cnn, st2file, save_image_dir="muon_hunter_cnn_muon_images
                 if save_hdf5:
                     update_evts_hdf5(hdf5_file, run_num=run_num, n_tels=1,
                                      images=this_image, create=True,
-                                     evt_nums=this_evt)
+                                     evt_nums=evtNums[i:i+1])
                 with open(save_text, "w") as outfile:
                     outfile.write(str(this_evt) + ', ' +str(telID) + ', ' + str(this_predict) + '\n')
 
@@ -214,7 +214,7 @@ def get_cnn_muons(muon_cnn, st2file, save_image_dir="muon_hunter_cnn_muon_images
                 if save_hdf5:
                     update_evts_hdf5(non_muon_hdf5_file, run_num=run_num, n_tels=1,
                                      images=this_image, create=True,
-                                     evt_nums=this_evt)
+                                     evt_nums=evtNums[i:i+1])
                 with open(save_non_muon_text, "w") as outfile_nm:
                     outfile_nm.write(str(this_evt) + ', ' +str(telID) + ', ' + str(this_predict) + '\n')
 
